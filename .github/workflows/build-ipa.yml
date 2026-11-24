@@ -44,33 +44,37 @@ jobs:
         APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
         echo "Found compiled app at: $APP_PATH"
         
-        # Копируем приложение в Payload
+        # Копируем приложение в Payload и даем полные права
         cp -R "$APP_PATH" Payload/zooma_cloudy.app
+        chmod -R 777 Payload/
         
-        # Удаляем PlugIns (PacketTunnel.appex), так как сторонние сертификаты (Feather)
-        # не имеют отдельного provisioning profile для расширения, из-за чего iOS блокирует установку
+        # Удаляем PlugIns (PacketTunnel.appex), предотвращая конфликт сертификата
         rm -rf Payload/zooma_cloudy.app/PlugIns
         
         # Перезаписываем Info.plist нашим полным манифестом
-        cp HappVPN/Info.plist Payload/zooma_cloudy.app/Info.plist
+        cp -f HappVPN/Info.plist Payload/zooma_cloudy.app/Info.plist
         
-        # Принудительно выставляем все строковые значения
+        # Принудительно устанавливаем свойства для иконки и названий
         plutil -replace CFBundleDisplayName -string "zooma cloudy" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleName -string "zooma_cloudy" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleExecutable -string "zooma_cloudy" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleIdentifier -string "com.zoomacloudy.app" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleShortVersionString -string "1.0.0" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace CFBundleIconFile -string "AppIcon" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace CFBundleIconName -string "AppIcon" Payload/zooma_cloudy.app/Info.plist
         
-        # Копируем иконки во всех размерах прямо в корень приложения
+        # Копируем иконки во всех стандартных форматах iOS
         ICON_DIR="HappVPN/Assets.xcassets/AppIcon.appiconset"
-        cp "$ICON_DIR/AppIcon-1024.png" Payload/zooma_cloudy.app/AppIcon.png
-        cp "$ICON_DIR/AppIcon60x60@2x.png" Payload/zooma_cloudy.app/AppIcon60x60@2x.png
-        cp "$ICON_DIR/AppIcon60x60@3x.png" Payload/zooma_cloudy.app/AppIcon60x60@3x.png
-        cp "$ICON_DIR/AppIcon76x76@2x~ipad.png" Payload/zooma_cloudy.app/AppIcon76x76@2x~ipad.png
+        cp -f "$ICON_DIR/AppIcon-1024.png" Payload/zooma_cloudy.app/AppIcon.png
+        cp -f "$ICON_DIR/AppIcon-1024.png" Payload/zooma_cloudy.app/Icon.png
+        cp -f "$ICON_DIR/AppIcon60x60@2x.png" Payload/zooma_cloudy.app/AppIcon60x60@2x.png
+        cp -f "$ICON_DIR/AppIcon60x60@3x.png" Payload/zooma_cloudy.app/AppIcon60x60@3x.png
+        cp -f "$ICON_DIR/AppIcon76x76@2x~ipad.png" Payload/zooma_cloudy.app/AppIcon76x76@2x~ipad.png
         
-        # Компилируем в бинарный plist формат iOS
+        # Компилируем Info.plist в бинарный формат iOS
         plutil -convert binary1 Payload/zooma_cloudy.app/Info.plist
         
+        # Выводим верификацию в лог сборки
         echo "=== VERIFIED PLIST IN PAYLOAD ==="
         plutil -p Payload/zooma_cloudy.app/Info.plist
         
@@ -88,9 +92,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: v1.0.2
-        name: "zooma cloudy v1.0.2"
-        body: "Готовый чистый .ipa файл для установки через Feather с иконкой и без конфликтов расширений."
+        tag_name: v1.0.3
+        name: "zooma cloudy v1.0.3"
+        body: "Обновленный интерфейс в стиле Happ, фикс отображения иконки и быстрое подключение узлов."
         files: zooma-cloudy.ipa
         prerelease: false
         make_latest: true
