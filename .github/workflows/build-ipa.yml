@@ -1,0 +1,47 @@
+name: Build HappVPN IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Select Xcode
+      run: sudo xcode-select -switch /Applications/Xcode.app
+
+    - name: Install XcodeGen
+      run: brew install xcodegen
+
+    - name: Generate Xcode Project
+      run: xcodegen generate
+
+    - name: Build and Package IPA
+      run: |
+        mkdir -p build Payload
+        
+        # Сборка проекта под архитектуру iOS
+        xcodebuild -project HappVPN.xcodeproj \
+          -scheme HappVPN \
+          -configuration Release \
+          -sdk iphoneos \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          CONFIGURATION_BUILD_DIR=build
+          
+        # Формирование .ipa архива
+        cp -r build/HappVPN.app Payload/
+        zip -r HappVPN.ipa Payload
+        
+    - name: Upload IPA Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: HappVPN-ipa
+        path: HappVPN.ipa
