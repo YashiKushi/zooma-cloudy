@@ -48,12 +48,10 @@ class VPNManager: ObservableObject {
             let serverHost = targetServer?.server ?? "1.1.1.1"
             
             let proto = NEVPNProtocolIKEv2()
-            proto.username = "zooma"
             proto.serverAddress = serverHost
             proto.remoteIdentifier = serverHost
             proto.localIdentifier = "zooma_cloudy"
             proto.authenticationMethod = .none
-            proto.useExtendedAuth = false
             proto.disconnectOnSleep = false
             
             self.vpnManager.protocolConfiguration = proto
