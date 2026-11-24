@@ -132,20 +132,12 @@ jobs:
           plutil -replace CFBundleShortVersionString -string "1.0.0" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
           plutil -replace CFBundleVersion -string "1" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
           plutil -convert binary1 Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
-          
-          # Внедряем Libbox.framework в PacketTunnel.appex/Frameworks
-          LIBBOX_FRAMEWORK=$(find Frameworks/ -name "Libbox.framework" -path "*/ios-arm64/*" | head -n 1)
-          if [ -n "$LIBBOX_FRAMEWORK" ]; then
-            echo "Embedding Libbox.framework from $LIBBOX_FRAMEWORK into PacketTunnel..."
-            mkdir -p Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks
-            cp -R -L "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/
-          fi
         fi
         
-        # Внедряем Libbox.framework в Main App Frameworks
+        # Внедряем Libbox.framework строго в Main App Frameworks (Apple QA1886: не дублировать в appex)
         LIBBOX_FRAMEWORK=$(find Frameworks/ -name "Libbox.framework" -path "*/ios-arm64/*" | head -n 1)
         if [ -n "$LIBBOX_FRAMEWORK" ]; then
-          echo "Embedding Libbox.framework into Main App..."
+          echo "Embedding Libbox.framework into Main App Frameworks..."
           mkdir -p Payload/zooma_cloudy.app/Frameworks
           cp -R -L "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/Frameworks/
         fi
@@ -175,17 +167,14 @@ jobs:
         # Компилируем Info.plist в бинарный формат iOS
         plutil -convert binary1 Payload/zooma_cloudy.app/Info.plist
         
-        # Проставляем Ad-Hoc подпись для валидной структуры пакета под Feather/sideloading
+        # Чистая Ad-Hoc подпись без жестко заданных fake entitlements
         if [ -d "Payload/zooma_cloudy.app/Frameworks/Libbox.framework" ]; then
           codesign --force --sign - --timestamp=none Payload/zooma_cloudy.app/Frameworks/Libbox.framework || true
         fi
-        if [ -d "Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/Libbox.framework" ]; then
-          codesign --force --sign - --timestamp=none Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/Libbox.framework || true
-        fi
         if [ -d "Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex" ]; then
-          codesign --force --sign - --timestamp=none --entitlements PacketTunnel/PacketTunnel.entitlements Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex || true
+          codesign --force --sign - --timestamp=none Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex || true
         fi
-        codesign --force --sign - --timestamp=none --entitlements HappVPN/zooma_cloudy.entitlements Payload/zooma_cloudy.app || true
+        codesign --force --sign - --timestamp=none Payload/zooma_cloudy.app || true
         
         # Выводим верификацию в лог сборки
         echo "=== VERIFIED APP STRUCTURE IN PAYLOAD ==="
@@ -208,8 +197,8 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: v1.0.9
-        name: "zooma cloudy v1.0.9"
+        tag_name: v1.0.10
+        name: "zooma cloudy v1.0.10"
         body: "Полноценный клиент VLESS Reality на ядре sing-box (Libbox.xcframework) с профилем в «VPN устройства» через NETunnelProviderManager, реальный TCP пинг, полноэкранный интерфейс."
         files: zooma-cloudy.ipa
         prerelease: false
