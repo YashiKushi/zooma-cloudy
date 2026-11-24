@@ -29,9 +29,19 @@ jobs:
         curl -L -o Libbox.xcframework.zip "https://github.com/EbrahimTahernejad/sing-box-lib/releases/download/1.11.11/Libbox.xcframework.zip"
         unzip -q Libbox.xcframework.zip -d Frameworks
         ls -la Frameworks/
-        if [ -d "Frameworks/Libbox.xcframework" ]; then
-          echo "Libbox.xcframework successfully extracted!"
-          find Frameworks/Libbox.xcframework -maxdepth 3
+        find Frameworks/ -name "*.h"
+
+    - name: Inspect Libbox Headers
+      run: |
+        HEADER=$(find Frameworks/ -name "Libbox.h" | head -n 1)
+        if [ -n "$HEADER" ]; then
+          echo "=== Found Libbox.h at: $HEADER ==="
+          echo "=== SEARCHING FOR PlatformInterface in $HEADER ==="
+          grep -n -C 5 "PlatformInterface" "$HEADER" || true
+          echo "=== SEARCHING FOR NewService in $HEADER ==="
+          grep -n -C 5 "NewService" "$HEADER" || true
+          echo "=== ALL EXPORTED FUNCTIONS IN Libbox.h ==="
+          grep -n "^FOUNDATION_EXPORT" "$HEADER" || true
         fi
 
     - name: Generate Xcode Project
@@ -39,6 +49,7 @@ jobs:
 
     - name: Build App & PacketTunnel Extension
       run: |
+        set -o pipefail
         xcodebuild -project "zooma_cloudy.xcodeproj" \
           -scheme "zooma_cloudy" \
           -configuration Release \
@@ -46,7 +57,13 @@ jobs:
           -derivedDataPath derived_data \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || {
+            echo "=========================================="
+            echo "=== XCODEBUILD FAILED! EXTRACTING ERRORS ==="
+            echo "=========================================="
+            grep -C 3 -E "(error:|fatal error:)" xcodebuild.log | tail -n 80
+            exit 1
+          }
 
     - name: Package IPA
       run: |
@@ -71,18 +88,20 @@ jobs:
           plutil -convert binary1 Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
           
           # Внедряем Libbox.framework в PacketTunnel.appex/Frameworks
-          if [ -d "Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework" ]; then
-            echo "Embedding Libbox.framework into PacketTunnel..."
+          LIBBOX_FRAMEWORK=$(find Frameworks/ -name "Libbox.framework" -path "*/ios-arm64/*" | head -n 1)
+          if [ -n "$LIBBOX_FRAMEWORK" ]; then
+            echo "Embedding Libbox.framework from $LIBBOX_FRAMEWORK into PacketTunnel..."
             mkdir -p Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks
-            cp -R Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/
+            cp -R "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/
           fi
         fi
         
         # Внедряем Libbox.framework в Main App Frameworks
-        if [ -d "Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework" ]; then
+        LIBBOX_FRAMEWORK=$(find Frameworks/ -name "Libbox.framework" -path "*/ios-arm64/*" | head -n 1)
+        if [ -n "$LIBBOX_FRAMEWORK" ]; then
           echo "Embedding Libbox.framework into Main App..."
           mkdir -p Payload/zooma_cloudy.app/Frameworks
-          cp -R Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework Payload/zooma_cloudy.app/Frameworks/
+          cp -R "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/Frameworks/
         fi
         
         # Перезаписываем Info.plist основного приложения

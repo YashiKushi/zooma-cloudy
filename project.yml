@@ -17,6 +17,7 @@ targets:
     dependencies:
       - target: PacketTunnel
       - framework: Frameworks/Libbox.xcframework
+        embed: true
     settings:
       PRODUCT_NAME: "zooma_cloudy"
       PRODUCT_BUNDLE_IDENTIFIER: com.zoomacloudy.app
@@ -43,6 +44,7 @@ targets:
       path: PacketTunnel/Info.plist
     dependencies:
       - framework: Frameworks/Libbox.xcframework
+        embed: false
     settings:
       PRODUCT_NAME: "PacketTunnel"
       PRODUCT_BUNDLE_IDENTIFIER: com.zoomacloudy.app.PacketTunnel
