@@ -48,10 +48,10 @@ jobs:
         cp -R "$APP_PATH" Payload/zooma_cloudy.app
         chmod -R 777 Payload/
         
-        # Удаляем PlugIns (PacketTunnel.appex), предотвращая конфликт сертификата
+        # Удаляем PlugIns (PacketTunnel.appex), предотвращая ошибку подписи в Feather
         rm -rf Payload/zooma_cloudy.app/PlugIns
         
-        # Перезаписываем Info.plist нашим полным манифестом
+        # Перезаписываем Info.plist
         cp -f HappVPN/Info.plist Payload/zooma_cloudy.app/Info.plist
         
         # Принудительно устанавливаем свойства для иконки и названий
@@ -92,9 +92,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: v1.0.3
-        name: "zooma cloudy v1.0.3"
-        body: "Обновленный интерфейс в стиле Happ, фикс отображения иконки и быстрое подключение узлов."
+        tag_name: v1.0.4
+        name: "zooma cloudy v1.0.4"
+        body: "Полный редизайн интерфейса, кнопка замера пинга всех серверов, удаление подписки и отдельных серверов, авто-подключение при добавлении подписки."
         files: zooma-cloudy.ipa
         prerelease: false
         make_latest: true

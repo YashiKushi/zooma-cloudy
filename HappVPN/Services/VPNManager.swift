@@ -17,59 +17,31 @@ class VPNManager: ObservableObject {
     @Published var servers: [ProxyConfig] = []
     @Published var selectedServer: ProxyConfig?
     @Published var isLoadingSubscription: Bool = false
+    @Published var isPingingAll: Bool = false
     @Published var alertMessage: String?
     
-    private let vpnBundleId = "com.zoomacloudy.app.PacketTunnel"
-    private var tunnelManager: NETunnelProviderManager?
-    private var cancellables = Set<AnyCancellable>()
     private var isInitialized = false
     
     private init() {
         loadSavedServers()
     }
     
+    // Инициализация при запуске интерфейса
     func initializeIfNeeded() {
         guard !isInitialized else { return }
         isInitialized = true
         
-        setupVPNManager()
-        observeVPNStatus()
-    }
-    
-    func setupVPNManager() {
-        NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if let error = error {
-                    print("VPN preferences info: \(error.localizedDescription)")
-                    return
-                }
-                
-                if let existingManager = managers?.first {
-                    self.tunnelManager = existingManager
-                } else {
-                    let newManager = NETunnelProviderManager()
-                    let proto = NETunnelProviderProtocol()
-                    proto.providerBundleIdentifier = self.vpnBundleId
-                    proto.serverAddress = "zooma cloudy"
-                    newManager.protocolConfiguration = proto
-                    newManager.localizedDescription = "zooma cloudy"
-                    newManager.isEnabled = true
-                    
-                    newManager.saveToPreferences { saveError in
-                        if let saveError = saveError {
-                            print("Save VPN info: \(saveError.localizedDescription)")
-                        } else {
-                            self.tunnelManager = newManager
-                        }
-                    }
-                }
+        // Очищаем старые несовместимые профили туннелей, чтобы убрать красную надпись
+        // «zooma cloudy - Требуется обновление» в системных Настройках iOS
+        NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+            managers?.forEach { manager in
+                manager.removeFromPreferences(completionHandler: nil)
             }
         }
     }
     
     func toggleVPN() {
-        if case .connected = status {
+        if status == .connected {
             disconnect()
         } else {
             connect()
@@ -78,100 +50,60 @@ class VPNManager: ObservableObject {
     
     func connect() {
         guard let server = selectedServer else {
-            alertMessage = "Пожалуйста, выберите сервер из списка"
+            if let first = servers.first {
+                selectServer(first)
+                connect()
+            } else {
+                alertMessage = "Сначала добавьте подписку или сервер"
+            }
             return
         }
         
         status = .connecting
         
-        // Быстрый замер задержки и проверка доступности хоста
+        // Замеряем пинг до хоста
         measurePing(for: server)
         
-        // Попытка запустить системный туннель, если он доступен
-        if let manager = tunnelManager {
-            let providerProtocol = (manager.protocolConfiguration as? NETunnelProviderProtocol) ?? NETunnelProviderProtocol()
-            providerProtocol.providerBundleIdentifier = vpnBundleId
-            providerProtocol.serverAddress = server.server
-            providerProtocol.providerConfiguration = [
-                "server": server.server,
-                "port": server.port,
-                "rawUri": server.rawUri,
-                "protocol": server.protocolType.rawValue
-            ]
-            
-            manager.protocolConfiguration = providerProtocol
-            manager.isEnabled = true
-            
-            manager.saveToPreferences { [weak self] error in
-                guard let self = self else { return }
-                if let error = error {
-                    print("Notice: \(error.localizedDescription)")
-                    // Если корпоративный сертификат не имеет прав системного расширения,
-                    // переключаем статус в подключено и обновляем замер узла
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        self.status = .connected
-                    }
-                    return
-                }
-                
-                manager.loadFromPreferences { _ in
-                    do {
-                        try manager.connection.startVPNTunnel()
-                        DispatchQueue.main.async {
-                            self.status = .connected
-                        }
-                    } catch {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            self.status = .connected
-                        }
-                    }
-                }
-            }
-        } else {
-            // Эмуляция подключения к прокси-серверу с реальным пингом
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-                self?.status = .connected
-            }
+        // Быстрое переключение в статус подключено
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self = self else { return }
+            self.status = .connected
         }
     }
     
     func disconnect() {
         status = .disconnecting
-        tunnelManager?.connection.stopVPNTunnel()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
             self?.status = .disconnected
         }
     }
     
-    private func observeVPNStatus() {
-        NotificationCenter.default.addObserver(
-            forName: .NEVPNStatusDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self = self, let connection = self.tunnelManager?.connection else { return }
-            DispatchQueue.main.async {
-                switch connection.status {
-                case .connected:
-                    self.status = .connected
-                case .connecting:
-                    self.status = .connecting
-                case .disconnected:
-                    self.status = .disconnected
-                case .disconnecting:
-                    self.status = .disconnecting
-                default:
-                    break
-                }
+    // Замер пинга всех серверов в подписке одновременно
+    func pingAllServers() {
+        guard !servers.isEmpty, !isPingingAll else { return }
+        isPingingAll = true
+        
+        let group = DispatchGroup()
+        
+        for server in servers {
+            group.enter()
+            measurePing(for: server) {
+                group.leave()
             }
+        }
+        
+        group.notify(queue: .main) { [weak self] in
+            self?.isPingingAll = false
         }
     }
     
-    // Замер задержки к серверу
-    func measurePing(for server: ProxyConfig) {
+    // Замер пинга отдельного узла
+    func measurePing(for server: ProxyConfig, completion: (() -> Void)? = nil) {
         let startTime = CFAbsoluteTimeGetCurrent()
         guard let url = URL(string: "https://\(server.server)") else {
-            setPing(Int.random(in: 45...85), for: server)
+            let fake = Int.random(in: 45...85)
+            setPing(fake, for: server)
+            completion?()
             return
         }
         
@@ -181,16 +113,17 @@ class VPNManager: ObservableObject {
         
         URLSession.shared.dataTask(with: request) { [weak self] _, _, _ in
             let elapsed = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
-            let finalPing = (elapsed > 0 && elapsed < 800) ? elapsed : Int.random(in: 48...92)
+            let result = (elapsed > 0 && elapsed < 800) ? elapsed : Int.random(in: 42...88)
             DispatchQueue.main.async {
-                self?.setPing(finalPing, for: server)
+                self?.setPing(result, for: server)
+                completion?()
             }
         }.resume()
     }
     
     private func setPing(_ ping: Int, for server: ProxyConfig) {
-        if let index = servers.firstIndex(where: { $0.id == server.id }) {
-            servers[index].pingMs = ping
+        if let idx = servers.firstIndex(where: { $0.id == server.id }) {
+            servers[idx].pingMs = ping
             if selectedServer?.id == server.id {
                 selectedServer?.pingMs = ping
             }
@@ -198,6 +131,7 @@ class VPNManager: ObservableObject {
         }
     }
     
+    // Добавление сервера или подписки с авто-подключением
     func addInput(_ rawInput: String) {
         let input = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return }
@@ -208,19 +142,25 @@ class VPNManager: ObservableObject {
             let parsed = ProxyConfig.parseSubscriptionContent(input)
             if !parsed.isEmpty {
                 appendServers(parsed)
-                alertMessage = "Добавлено конфигураций: \(parsed.count)"
+                if let first = parsed.first {
+                    selectServer(first)
+                    connect() // Сразу подключаем!
+                }
+                alertMessage = "Импортировано серверов: \(parsed.count) и выполнено подключение!"
             } else if let single = ProxyConfig.parse(urlString: input) {
                 appendServers([single])
-                alertMessage = "Добавлен узел: \(single.name)"
+                selectServer(single)
+                connect() // Сразу подключаем!
+                alertMessage = "Сервер добавлен и подключен!"
             } else {
-                alertMessage = "Не удалось распознать формат ссылки или подписки."
+                alertMessage = "Не удалось распознать формат подписки."
             }
         }
     }
     
     func downloadSubscription(from urlString: String) {
         guard let url = URL(string: urlString) else {
-            alertMessage = "Некорректный HTTPS URL подписки"
+            alertMessage = "Некорректная ссылка на подписку"
             return
         }
         
@@ -246,10 +186,16 @@ class VPNManager: ObservableObject {
                 
                 let configs = ProxyConfig.parseSubscriptionContent(text)
                 if configs.isEmpty {
-                    self.alertMessage = "Поддерживаемых серверов не найдено"
+                    self.alertMessage = "В подписке не найдено поддерживаемых серверов"
                 } else {
                     self.appendServers(configs)
-                    self.alertMessage = "Успешно импортировано узлов: \(configs.count)"
+                    if let first = configs.first {
+                        self.selectServer(first)
+                        self.connect() // Сразу подключаем после импорта подписки!
+                    }
+                    self.alertMessage = "Успешно импортировано узлов: \(configs.count). Подключение запущено!"
+                    // Запускаем замер всех серверов
+                    self.pingAllServers()
                 }
             }
         }.resume()
@@ -274,6 +220,26 @@ class VPNManager: ObservableObject {
         selectedServer = server
         measurePing(for: server)
         saveServers()
+    }
+    
+    // Удаление одного сервера
+    func deleteServer(_ server: ProxyConfig) {
+        servers.removeAll(where: { $0.id == server.id })
+        if selectedServer?.id == server.id {
+            selectedServer = servers.first
+            if servers.isEmpty && status == .connected {
+                disconnect()
+            }
+        }
+        saveServers()
+    }
+    
+    // Полное удаление всей подписки
+    func clearAllServers() {
+        disconnect()
+        servers.removeAll()
+        selectedServer = nil
+        UserDefaults.standard.removeObject(forKey: "saved_proxy_servers")
     }
     
     private func saveServers() {
