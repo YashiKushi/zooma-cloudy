@@ -2,7 +2,7 @@ import Foundation
 import NetworkExtension
 import Combine
 
-enum VPNStatus {
+enum VPNStatus: Equatable {
     case disconnected
     case connecting
     case connected
