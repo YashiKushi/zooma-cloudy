@@ -38,38 +38,40 @@ jobs:
 
     - name: Package IPA
       run: |
-        APP_PATH="derived_data/Build/Products/Release-iphoneos/zooma_cloudy.app"
+        rm -rf Payload
+        mkdir -p Payload
         
-        if [ ! -d "$APP_PATH" ]; then
-          echo "ERROR: App bundle not found at $APP_PATH. Searching..."
-          APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
-        fi
+        APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
+        echo "Found compiled app at: $APP_PATH"
         
-        echo "Using app bundle: $APP_PATH"
+        # Копируем приложение в Payload
+        cp -R "$APP_PATH" Payload/zooma_cloudy.app
         
-        # Записываем чистый статический Info.plist
-        cp HappVPN/Info.plist "$APP_PATH/Info.plist"
+        # Гарантированно перезаписываем Info.plist нашим чистым манифестом
+        cp HappVPN/Info.plist Payload/zooma_cloudy.app/Info.plist
         
-        # Компилируем Info.plist в бинарный формат iOS
-        plutil -convert binary1 "$APP_PATH/Info.plist"
+        # Принудительно устанавливаем точные строковые значения через plutil
+        plutil -replace CFBundleDisplayName -string "zooma cloudy" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace CFBundleName -string "zooma_cloudy" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace CFBundleExecutable -string "zooma_cloudy" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace CFBundleIdentifier -string "com.zoomacloudy.app" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace CFBundleShortVersionString -string "1.0.0" Payload/zooma_cloudy.app/Info.plist
         
-        # Выводим в лог для проверки
-        echo "=== VERIFYING INFO.PLIST ==="
-        plutil -p "$APP_PATH/Info.plist"
+        # Компилируем в бинарный plist формат iOS
+        plutil -convert binary1 Payload/zooma_cloudy.app/Info.plist
+        
+        # Выводим в лог для стопроцентной проверки
+        echo "=== VERIFIED PLIST IN PAYLOAD ==="
+        plutil -p Payload/zooma_cloudy.app/Info.plist
         
         # Копируем иконки в корень бандла
         if [ -f "HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" ]; then
-          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon60x60@2x.png"
-          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon60x60@3x.png"
-          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon.png"
+          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png Payload/zooma_cloudy.app/AppIcon60x60@2x.png
+          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png Payload/zooma_cloudy.app/AppIcon60x60@3x.png
+          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png Payload/zooma_cloudy.app/AppIcon.png
         fi
         
-        # Формируем структуру Payload
-        rm -rf Payload
-        mkdir -p Payload
-        cp -R "$APP_PATH" Payload/
-        
-        # Упаковываем в .ipa
+        # Архивируем в .ipa
         zip -r -y "zooma-cloudy.ipa" Payload
         ls -la "zooma-cloudy.ipa"
 
@@ -83,10 +85,12 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: latest
-        name: "zooma cloudy v1.0.0"
-        body: "Прямая ссылка для скачивания .ipa файла (без zip-архива) для Feather / Sideloadly / TrollStore."
+        tag_name: v1.0.1
+        name: "zooma cloudy v1.0.1"
+        body: "Прямая ссылка на готовый .ipa файл для установки через Feather."
         files: zooma-cloudy.ipa
         prerelease: false
+        make_latest: true
+        overwrite: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
