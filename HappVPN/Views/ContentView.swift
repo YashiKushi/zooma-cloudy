@@ -207,14 +207,24 @@ struct ContentView: View {
                             .foregroundColor(.gray)
                             .lineLimit(1)
                         
-                        if let ping = selected.pingMs {
-                            Text("\(ping) ms")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(ping < 100 ? Color.green : Color.orange)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(Color.white.opacity(0.08))
-                                .cornerRadius(4)
+                        if selected.isTested {
+                            if let ping = selected.pingMs {
+                                Text("\(ping) ms")
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(ping < 100 ? Color.green : Color.orange)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.white.opacity(0.08))
+                                    .cornerRadius(4)
+                            } else {
+                                Text("Таймаут")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(Color(red: 1.0, green: 0.35, blue: 0.35))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.red.opacity(0.18))
+                                    .cornerRadius(4)
+                            }
                         }
                     }
                 } else {
@@ -462,14 +472,30 @@ struct ServerCardRow: View {
             Spacer(minLength: 4)
             
             // Замер пинга
-            if let ping = server.pingMs {
-                Text("\(ping) ms")
+            if server.isTested {
+                if let ping = server.pingMs {
+                    Text("\(ping) ms")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(pingColor(ping))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.07))
+                        .cornerRadius(6)
+                } else {
+                    Text("Таймаут")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(red: 1.0, green: 0.35, blue: 0.35))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.red.opacity(0.18))
+                        .cornerRadius(6)
+                }
+            } else {
+                Text("—")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(pingColor(ping))
+                    .foregroundColor(.gray.opacity(0.4))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(Color.white.opacity(0.07))
-                    .cornerRadius(6)
             }
             
             // Кнопка удаления этого сервера

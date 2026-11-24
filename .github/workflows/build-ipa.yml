@@ -93,9 +93,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: v1.0.5
-        name: "zooma cloudy v1.0.5"
-        body: "Полноэкранный нативный интерфейс (без черных рамок), автоматическое добавление конфигурации в Настройки iOS -> VPN, авто-подключение и замер пинга."
+        tag_name: v1.0.6
+        name: "zooma cloudy v1.0.6"
+        body: "Реальный TCP пинг узлов без рандома (таймауты для неработающих серверов) и системные entitlements для добавления конфигурации в Настройки iOS."
         files: zooma-cloudy.ipa
         prerelease: false
         make_latest: true

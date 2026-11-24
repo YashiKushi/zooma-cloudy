@@ -17,6 +17,7 @@ struct ProxyConfig: Identifiable, Codable, Equatable {
     var protocolType: ProxyProtocolType
     var rawUri: String
     var pingMs: Int?
+    var isTested: Bool = false
     var isSelected: Bool = false
     
     // Парсер единичной ссылки vless://, vmess://, trojan://, ss://, wg://
@@ -53,6 +54,7 @@ struct ProxyConfig: Identifiable, Codable, Equatable {
             protocolType: proto,
             rawUri: trimmed,
             pingMs: nil,
+            isTested: false,
             isSelected: false
         )
     }

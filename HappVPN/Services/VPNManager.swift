@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import NetworkExtension
 import Combine
 
@@ -34,6 +35,11 @@ class VPNManager: ObservableObject {
         
         setupSystemVPN()
         observeSystemVPNStatus()
+        
+        // Автоматически замеряем пинг серверов при запуске
+        if !servers.isEmpty {
+            pingAllServers()
+        }
     }
     
     // Регистрация и синхронизация системного профиля VPN в «Настройки iOS -> VPN»
@@ -145,7 +151,7 @@ class VPNManager: ObservableObject {
         }
     }
     
-    // Замер пинга всех серверов одновременно
+    // Замер реального пинга всех серверов одновременно
     func pingAllServers() {
         guard !servers.isEmpty, !isPingingAll else { return }
         isPingingAll = true
@@ -164,35 +170,66 @@ class VPNManager: ObservableObject {
         }
     }
     
-    // Замер пинга отдельного узла
+    // Реальный замер TCP пинга к хосту и порту сервера (без случайных чисел)
     func measurePing(for server: ProxyConfig, completion: (() -> Void)? = nil) {
-        guard let url = URL(string: "https://\(server.server)") else {
-            let fallback = Int.random(in: 45...85)
-            setPing(fallback, for: server)
+        let hostStr = server.server.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !hostStr.isEmpty, let portVal = UInt16(exactly: server.port) ?? UInt16(443) else {
+            setPing(nil, isTested: true, for: server)
             completion?()
             return
         }
         
-        let startTime = CFAbsoluteTimeGetCurrent()
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 3.0
-        request.httpMethod = "HEAD"
+        let endpoint = NWEndpoint.Host(hostStr)
+        guard let port = NWEndpoint.Port(rawValue: portVal) else {
+            setPing(nil, isTested: true, for: server)
+            completion?()
+            return
+        }
         
-        URLSession.shared.dataTask(with: request) { [weak self] _, _, _ in
-            let elapsed = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
-            let finalPing = (elapsed > 0 && elapsed < 800) ? elapsed : Int.random(in: 45...85)
+        let params = NWParameters.tcp
+        let connection = NWConnection(host: endpoint, port: port, using: params)
+        let startTime = CFAbsoluteTimeGetCurrent()
+        
+        var isFinished = false
+        let finishWithResult: (Int?) -> Void = { [weak self] ping in
+            guard !isFinished else { return }
+            isFinished = true
+            connection.cancel()
             DispatchQueue.main.async {
-                self?.setPing(finalPing, for: server)
+                self?.setPing(ping, isTested: true, for: server)
                 completion?()
             }
-        }.resume()
+        }
+        
+        // Таймаут 2.5 секунды: если сервер недоступен, фиксируем таймаут
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.5) {
+            finishWithResult(nil)
+        }
+        
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                let elapsed = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
+                finishWithResult(max(1, elapsed))
+            case .failed:
+                finishWithResult(nil)
+            case .cancelled:
+                break
+            default:
+                break
+            }
+        }
+        
+        connection.start(queue: DispatchQueue.global(qos: .userInitiated))
     }
     
-    private func setPing(_ ping: Int, for server: ProxyConfig) {
+    private func setPing(_ ping: Int?, isTested: Bool, for server: ProxyConfig) {
         if let index = servers.firstIndex(where: { $0.id == server.id }) {
             servers[index].pingMs = ping
+            servers[index].isTested = isTested
             if selectedServer?.id == server.id {
                 selectedServer?.pingMs = ping
+                selectedServer?.isTested = isTested
             }
             saveServers()
         }
@@ -212,7 +249,7 @@ class VPNManager: ObservableObject {
                     selectServer(first)
                     connect() // Сразу подключаем!
                 }
-                alertMessage = "Добавлено конфигураций: \(parsed.count). Подключение запущено!"
+                alertMessage = "Добавлено узлов: \(parsed.count). Подключение запущено!"
                 pingAllServers()
             } else if let single = ProxyConfig.parse(urlString: input) {
                 appendServers([single])
@@ -328,7 +365,8 @@ class VPNManager: ObservableObject {
                 port: 443,
                 protocolType: .vless,
                 rawUri: "vless://uuid@de1.example.com:443?security=reality#Германия",
-                pingMs: 58,
+                pingMs: nil,
+                isTested: false,
                 isSelected: true
             )
             self.servers = [sample]
