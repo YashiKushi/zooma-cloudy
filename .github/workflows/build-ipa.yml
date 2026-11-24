@@ -48,8 +48,15 @@ jobs:
         cp -R "$APP_PATH" Payload/zooma_cloudy.app
         chmod -R 777 Payload/
         
-        # Удаляем PlugIns (PacketTunnel.appex), предотвращая ошибку подписи в Feather
-        rm -rf Payload/zooma_cloudy.app/PlugIns
+        # Настройка и валидация PacketTunnel.appex внутри PlugIns
+        if [ -d "Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex" ]; then
+          echo "Found PacketTunnel.appex, configuring plists and permissions..."
+          cp -f PacketTunnel/Info.plist Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -replace CFBundleExecutable -string "PacketTunnel" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -replace CFBundleIdentifier -string "com.zoomacloudy.app.PacketTunnel" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -replace CFBundleShortVersionString -string "1.0.0" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -convert binary1 Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+        fi
         
         # Перезаписываем Info.plist
         cp -f HappVPN/Info.plist Payload/zooma_cloudy.app/Info.plist
@@ -93,9 +100,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: v1.0.6
-        name: "zooma cloudy v1.0.6"
-        body: "Реальный TCP пинг узлов без рандома (таймауты для неработающих серверов) и системные entitlements для добавления конфигурации в Настройки iOS."
+        tag_name: v1.0.7
+        name: "zooma cloudy v1.0.7"
+        body: "Внедрен PacketTunnel extension с NETunnelProviderManager для системного создания профиля в Настройках iOS -> VPN, реальный TCP пинг."
         files: zooma-cloudy.ipa
         prerelease: false
         make_latest: true
