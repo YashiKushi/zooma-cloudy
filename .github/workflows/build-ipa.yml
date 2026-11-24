@@ -29,19 +29,20 @@ jobs:
         curl -L -o Libbox.xcframework.zip "https://github.com/EbrahimTahernejad/sing-box-lib/releases/download/1.11.11/Libbox.xcframework.zip"
         unzip -q Libbox.xcframework.zip -d Frameworks
         ls -la Frameworks/
-        find Frameworks/ -name "*.h"
 
     - name: Inspect Libbox Headers
       run: |
         HEADER=$(find Frameworks/ -name "Libbox.h" | head -n 1)
         if [ -n "$HEADER" ]; then
           echo "=== Found Libbox.h at: $HEADER ==="
-          echo "=== SEARCHING FOR PlatformInterface in $HEADER ==="
-          grep -n -C 5 "PlatformInterface" "$HEADER" || true
-          echo "=== SEARCHING FOR NewService in $HEADER ==="
-          grep -n -C 5 "NewService" "$HEADER" || true
-          echo "=== ALL EXPORTED FUNCTIONS IN Libbox.h ==="
-          grep -n "^FOUNDATION_EXPORT" "$HEADER" || true
+          echo "## Libbox.h PlatformInterface Protocol" >> $GITHUB_STEP_SUMMARY
+          echo '```objc' >> $GITHUB_STEP_SUMMARY
+          sed -n '/@protocol LibboxPlatformInterface/,/@end/p' "$HEADER" | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "## LibboxNewService Signature" >> $GITHUB_STEP_SUMMARY
+          echo '```objc' >> $GITHUB_STEP_SUMMARY
+          grep -C 2 "LibboxNewService" "$HEADER" | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Generate Xcode Project
@@ -62,8 +63,20 @@ jobs:
             echo "=== XCODEBUILD FAILED! EXTRACTING ERRORS ==="
             echo "=========================================="
             grep -C 3 -E "(error:|fatal error:)" xcodebuild.log | tail -n 80
+            echo "## Xcodebuild Errors" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -C 2 -E "(error:|fatal error:)" xcodebuild.log | tail -n 60 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           }
+
+    - name: Upload Build Log Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: xcodebuild.log
+        if-no-files-found: ignore
 
     - name: Package IPA
       run: |
