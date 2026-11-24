@@ -19,7 +19,7 @@ class VPNManager: ObservableObject {
     @Published var isLoadingSubscription: Bool = false
     @Published var alertMessage: String?
     
-    private let vpnBundleId = "com.happ.vpn.PacketTunnel"
+    private let vpnBundleId = "com.zoomacloudy.app.PacketTunnel"
     private var tunnelManager: NETunnelProviderManager?
     private var cancellables = Set<AnyCancellable>()
     
@@ -43,9 +43,9 @@ class VPNManager: ObservableObject {
                 let newManager = NETunnelProviderManager()
                 let proto = NETunnelProviderProtocol()
                 proto.providerBundleIdentifier = self.vpnBundleId
-                proto.serverAddress = "Happ Proxy"
+                proto.serverAddress = "zooma cloudy"
                 newManager.protocolConfiguration = proto
-                newManager.localizedDescription = "Happ VPN"
+                newManager.localizedDescription = "zooma cloudy"
                 newManager.isEnabled = true
                 
                 newManager.saveToPreferences { saveError in

@@ -1,4 +1,4 @@
-name: Build HappVPN IPA
+name: Build zooma cloudy IPA
 
 on:
   push:
@@ -24,8 +24,8 @@ jobs:
 
     - name: Build App
       run: |
-        xcodebuild -project HappVPN.xcodeproj \
-          -scheme HappVPN \
+        xcodebuild -project "zooma cloudy.xcodeproj" \
+          -scheme "zooma cloudy" \
           -configuration Release \
           -sdk iphoneos \
           -derivedDataPath derived_data \
@@ -36,20 +36,18 @@ jobs:
     - name: Package IPA
       run: |
         mkdir -p Payload
-        APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "HappVPN.app" -type d | head -n 1)
-        echo "Found app at: $APP_PATH"
+        APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "*.app" -type d -maxdepth 1 | head -n 1)
+        echo "Found compiled app bundle at: $APP_PATH"
         
-        # Проверка наличия Info.plist
-        if [ ! -f "$APP_PATH/Info.plist" ]; then
-          echo "Copying Info.plist directly into bundle..."
-          cp HappVPN/Info.plist "$APP_PATH/Info.plist"
-        fi
+        # Гарантируем корректный Info.plist внутри .app
+        cp HappVPN/Info.plist "$APP_PATH/Info.plist"
         
+        # Копируем в Payload для формирования валидного IPA
         cp -r "$APP_PATH" Payload/
-        zip -r HappVPN.ipa Payload
+        zip -r "zooma-cloudy.ipa" Payload
 
     - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: HappVPN-ipa
-        path: HappVPN.ipa
+        name: zooma-cloudy-ipa
+        path: "zooma-cloudy.ipa"

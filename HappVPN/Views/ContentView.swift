@@ -13,7 +13,7 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 20) {
-                    // Верхний блок: статус и кнопка подключения в стиле Happ
+                    // Верхний блок: статус и кнопка подключения в стиле zooma cloudy
                     VStack(spacing: 16) {
                         statusBadge
                         
@@ -77,7 +77,7 @@ struct ContentView: View {
                 }
                 .padding(.top, 10)
             }
-            .navigationTitle("Happ VPN")
+            .navigationTitle("zooma cloudy")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
