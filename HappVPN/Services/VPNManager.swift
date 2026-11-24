@@ -173,12 +173,13 @@ class VPNManager: ObservableObject {
     // Реальный замер TCP пинга к хосту и порту сервера (без случайных чисел)
     func measurePing(for server: ProxyConfig, completion: (() -> Void)? = nil) {
         let hostStr = server.server.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !hostStr.isEmpty, let portVal = UInt16(exactly: server.port) ?? UInt16(443) else {
+        guard !hostStr.isEmpty else {
             setPing(nil, isTested: true, for: server)
             completion?()
             return
         }
         
+        let portVal = UInt16(exactly: server.port) ?? 443
         let endpoint = NWEndpoint.Host(hostStr)
         guard let port = NWEndpoint.Port(rawValue: portVal) else {
             setPing(nil, isTested: true, for: server)
