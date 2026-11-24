@@ -62,13 +62,23 @@ jobs:
             echo "=========================================="
             echo "=== XCODEBUILD FAILED! EXTRACTING ERRORS ==="
             echo "=========================================="
-            grep -C 3 -E "(error:|fatal error:)" xcodebuild.log | tail -n 80
-            echo "## Xcodebuild Errors" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -C 2 -E "(error:|fatal error:)" xcodebuild.log | tail -n 60 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -C 5 -E "(error:|fatal error:)" xcodebuild.log | tail -n 120
             exit 1
           }
+
+    - name: Push debug branch on failure
+      if: failure()
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git checkout -B ci-debug
+        mkdir -p debug
+        HEADER=$(find Frameworks/ -name "Libbox.h" | head -n 1)
+        [ -n "$HEADER" ] && cp "$HEADER" debug/Libbox.h
+        tail -n 250 xcodebuild.log > debug/xcodebuild-errors.txt
+        git add -f debug/
+        git commit -m "debug: xcodebuild failure and Libbox.h"
+        git push -f origin ci-debug
 
     - name: Upload Build Log Artifact
       if: always()
