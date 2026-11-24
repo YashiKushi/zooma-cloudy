@@ -24,8 +24,8 @@ jobs:
 
     - name: Build App
       run: |
-        xcodebuild -project "zooma cloudy.xcodeproj" \
-          -scheme "zooma cloudy" \
+        xcodebuild -project "zooma_cloudy.xcodeproj" \
+          -scheme "zooma_cloudy" \
           -configuration Release \
           -sdk iphoneos \
           -derivedDataPath derived_data \

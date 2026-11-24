@@ -7,13 +7,13 @@
 	<key>CFBundleDisplayName</key>
 	<string>zooma cloudy</string>
 	<key>CFBundleExecutable</key>
-	<string>zooma cloudy</string>
+	<string>zooma_cloudy</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.zoomacloudy.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>zooma cloudy</string>
+	<string>zooma_cloudy</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>

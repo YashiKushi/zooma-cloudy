@@ -1,10 +1,10 @@
-name: "zooma cloudy"
+name: zooma_cloudy
 options:
   bundleIdPrefix: com.zoomacloudy
   deploymentTarget:
     iOS: "15.0"
 targets:
-  "zooma cloudy":
+  zooma_cloudy:
     type: application
     platform: iOS
     deploymentTarget: "15.0"
@@ -15,7 +15,7 @@ targets:
     dependencies:
       - target: PacketTunnel
     settings:
-      PRODUCT_NAME: "zooma cloudy"
+      PRODUCT_NAME: "zooma_cloudy"
       PRODUCT_BUNDLE_IDENTIFIER: com.zoomacloudy.app
       INFOPLIST_FILE: HappVPN/Info.plist
       GENERATE_INFOPLIST_FILE: NO
