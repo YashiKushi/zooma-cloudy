@@ -29,6 +29,29 @@ jobs:
         curl -L -o Libbox.xcframework.zip "https://github.com/EbrahimTahernejad/sing-box-lib/releases/download/1.11.11/Libbox.xcframework.zip"
         unzip -q Libbox.xcframework.zip -d Frameworks
         ls -la Frameworks/
+        
+        # Flatten macOS-style deep bundles (Versions/A or Versions/Current) into shallow iOS bundles
+        echo "Checking and flattening framework bundles for iOS..."
+        for FW in $(find Frameworks/ -name "*.framework" -type d); do
+          if [ -d "$FW/Versions" ]; then
+            echo "Flattening deep bundle: $FW"
+            SOURCE_DIR=""
+            if [ -d "$FW/Versions/Current" ]; then
+              SOURCE_DIR="$FW/Versions/Current"
+            elif [ -d "$FW/Versions/A" ]; then
+              SOURCE_DIR="$FW/Versions/A"
+            fi
+            
+            if [ -n "$SOURCE_DIR" ]; then
+              mkdir -p "$FW.tmp"
+              cp -R -L "$SOURCE_DIR/"* "$FW.tmp/"
+              rm -rf "$FW"
+              mv "$FW.tmp" "$FW"
+            fi
+          fi
+        done
+        echo "Framework structure after flattening:"
+        find Frameworks/ -maxdepth 4
 
     - name: Inspect Libbox Headers
       run: |
@@ -115,7 +138,7 @@ jobs:
           if [ -n "$LIBBOX_FRAMEWORK" ]; then
             echo "Embedding Libbox.framework from $LIBBOX_FRAMEWORK into PacketTunnel..."
             mkdir -p Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks
-            cp -R "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/
+            cp -R -L "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/
           fi
         fi
         
@@ -124,7 +147,7 @@ jobs:
         if [ -n "$LIBBOX_FRAMEWORK" ]; then
           echo "Embedding Libbox.framework into Main App..."
           mkdir -p Payload/zooma_cloudy.app/Frameworks
-          cp -R "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/Frameworks/
+          cp -R -L "$LIBBOX_FRAMEWORK" Payload/zooma_cloudy.app/Frameworks/
         fi
         
         # Перезаписываем Info.plist основного приложения
