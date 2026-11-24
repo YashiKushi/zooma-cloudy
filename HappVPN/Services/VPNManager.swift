@@ -22,37 +22,47 @@ class VPNManager: ObservableObject {
     private let vpnBundleId = "com.zoomacloudy.app.PacketTunnel"
     private var tunnelManager: NETunnelProviderManager?
     private var cancellables = Set<AnyCancellable>()
+    private var isInitialized = false
     
     private init() {
         loadSavedServers()
+    }
+    
+    // Безопасная отложенная инициализация при появлении интерфейса
+    func initializeIfNeeded() {
+        guard !isInitialized else { return }
+        isInitialized = true
+        
         setupVPNManager()
         observeVPNStatus()
     }
     
     func setupVPNManager() {
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
-            guard let self = self else { return }
-            if let error = error {
-                print("Ошибка загрузки VPN профиля: \(error.localizedDescription)")
-                return
-            }
-            
-            if let existingManager = managers?.first {
-                self.tunnelManager = existingManager
-            } else {
-                let newManager = NETunnelProviderManager()
-                let proto = NETunnelProviderProtocol()
-                proto.providerBundleIdentifier = self.vpnBundleId
-                proto.serverAddress = "zooma cloudy"
-                newManager.protocolConfiguration = proto
-                newManager.localizedDescription = "zooma cloudy"
-                newManager.isEnabled = true
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let error = error {
+                    print("Предупреждение VPN профиля: \(error.localizedDescription)")
+                    return
+                }
                 
-                newManager.saveToPreferences { saveError in
-                    if let saveError = saveError {
-                        print("Ошибка сохранения VPN конфигурации: \(saveError.localizedDescription)")
-                    } else {
-                        self.tunnelManager = newManager
+                if let existingManager = managers?.first {
+                    self.tunnelManager = existingManager
+                } else {
+                    let newManager = NETunnelProviderManager()
+                    let proto = NETunnelProviderProtocol()
+                    proto.providerBundleIdentifier = self.vpnBundleId
+                    proto.serverAddress = "zooma cloudy"
+                    newManager.protocolConfiguration = proto
+                    newManager.localizedDescription = "zooma cloudy"
+                    newManager.isEnabled = true
+                    
+                    newManager.saveToPreferences { saveError in
+                        if let saveError = saveError {
+                            print("Ошибка сохранения VPN конфигурации: \(saveError.localizedDescription)")
+                        } else {
+                            self.tunnelManager = newManager
+                        }
                     }
                 }
             }
@@ -146,7 +156,6 @@ class VPNManager: ObservableObject {
         if input.lowercased().hasPrefix("http://") || input.lowercased().hasPrefix("https://") {
             downloadSubscription(from: input)
         } else {
-            // Либо одиночный URL, либо многострочный список / Base64 в буфере
             let parsed = ProxyConfig.parseSubscriptionContent(input)
             if !parsed.isEmpty {
                 appendServers(parsed)

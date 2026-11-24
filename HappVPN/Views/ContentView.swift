@@ -92,6 +92,9 @@ struct ContentView: View {
             .sheet(isPresented: $showingAddSheet) {
                 addServerSheet
             }
+            .onAppear {
+                vpnManager.initializeIfNeeded()
+            }
             .alert(isPresented: Binding<Bool>(
                 get: { vpnManager.alertMessage != nil },
                 set: { if !$0 { vpnManager.alertMessage = nil } }
