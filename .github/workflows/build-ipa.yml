@@ -42,6 +42,13 @@ jobs:
         # Гарантируем корректный Info.plist внутри .app
         cp HappVPN/Info.plist "$APP_PATH/Info.plist"
         
+        # Копируем иконки в корень бандла для корректного отображения в Feather/iOS
+        if [ -f "HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" ]; then
+          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon60x60@2x.png"
+          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon60x60@3x.png"
+          cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon.png"
+        fi
+        
         # Копируем в Payload для формирования валидного IPA
         cp -r "$APP_PATH" Payload/
         zip -r "zooma-cloudy.ipa" Payload
