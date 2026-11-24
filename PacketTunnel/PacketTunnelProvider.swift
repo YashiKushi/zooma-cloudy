@@ -42,6 +42,22 @@ public class ExtensionPlatformInterface: NSObject, LibboxPlatformInterfaceProtoc
     public func includeAllNetworks() -> Bool {
         return false
     }
+    
+    public func getInterfaces() throws -> LibboxNetworkInterfaceIteratorProtocol? {
+        return nil
+    }
+    
+    public func readWIFIState() -> LibboxWIFIState? {
+        return nil
+    }
+    
+    public func packageName(byUid uid: Int32, error: NSErrorPointer) -> String {
+        return ""
+    }
+    
+    public func uid(byPackageName packageName: String?, ret0_: UnsafeMutablePointer<Int32>?) throws {
+        ret0_?.pointee = 0
+    }
 }
 #endif
 
@@ -80,7 +96,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             if let json = configJson, !json.isEmpty {
                 do {
                     let platformInterface = ExtensionPlatformInterface(self)
-                    let service = try LibboxNewService(json, platformInterface)
+                    let service = try LibboxNewService(json, platformInterface, nil)
                     self.boxService = service
                     try service.start()
                     NSLog("[PacketTunnel] Sing-box core successfully started!")
