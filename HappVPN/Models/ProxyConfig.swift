@@ -19,7 +19,7 @@ struct ProxyConfig: Identifiable, Codable, Equatable {
     var pingMs: Int?
     var isSelected: Bool = false
     
-    // Парсер ссылок vless://, vmess://, trojan://, ss://
+    // Парсер единичной ссылки vless://, vmess://, trojan://, ss://, wg://
     static func parse(urlString: String) -> ProxyConfig? {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed) else { return nil }
@@ -42,7 +42,7 @@ struct ProxyConfig: Identifiable, Codable, Equatable {
         case "wg":
             proto = .wireguard
         default:
-            proto = .unknown
+            return nil
         }
         
         return ProxyConfig(
@@ -56,5 +56,45 @@ struct ProxyConfig: Identifiable, Codable, Equatable {
             isSelected: false
         )
     }
+    
+    // Парсинг текста подписки (Base64 или многострочный список серверов)
+    static func parseSubscriptionContent(_ rawContent: String) -> [ProxyConfig] {
+        var content = rawContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Попытка раскодировать Base64 (стандарт для V2Ray/Xray/Happ подписок)
+        if let decoded = decodeBase64(content) {
+            content = decoded
+        }
+        
+        let lines = content.components(separatedBy: .newlines)
+        var configs: [ProxyConfig] = []
+        
+        for line in lines {
+            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedLine.isEmpty { continue }
+            
+            if let config = ProxyConfig.parse(urlString: trimmedLine) {
+                configs.append(config)
+            }
+        }
+        
+        return configs
+    }
+    
+    // Безопасный декодер Base64 (включая URL-safe и восстановление паддинга)
+    private static func decodeBase64(_ base64Str: String) -> String? {
+        var str = base64Str.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        
+        let rem = str.count % 4
+        if rem > 0 {
+            str.append(String(repeating: "=", count: 4 - rem))
+        }
+        
+        guard let data = Data(base64Encoded: str, options: .ignoreUnknownCharacters) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
 }
-

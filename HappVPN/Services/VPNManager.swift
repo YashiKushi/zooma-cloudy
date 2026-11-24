@@ -16,6 +16,8 @@ class VPNManager: ObservableObject {
     @Published var status: VPNStatus = .disconnected
     @Published var servers: [ProxyConfig] = []
     @Published var selectedServer: ProxyConfig?
+    @Published var isLoadingSubscription: Bool = false
+    @Published var alertMessage: String?
     
     private let vpnBundleId = "com.happ.vpn.PacketTunnel"
     private var tunnelManager: NETunnelProviderManager?
@@ -136,14 +138,77 @@ class VPNManager: ObservableObject {
         }
     }
     
-    func addServer(from urlString: String) {
-        if let config = ProxyConfig.parse(urlString: urlString) {
-            servers.append(config)
-            if selectedServer == nil {
-                selectServer(config)
+    // Добавление сервера по одиночной ссылке, списку или HTTPS-подписке
+    func addInput(_ rawInput: String) {
+        let input = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else { return }
+        
+        if input.lowercased().hasPrefix("http://") || input.lowercased().hasPrefix("https://") {
+            downloadSubscription(from: input)
+        } else {
+            // Либо одиночный URL, либо многострочный список / Base64 в буфере
+            let parsed = ProxyConfig.parseSubscriptionContent(input)
+            if !parsed.isEmpty {
+                appendServers(parsed)
+                alertMessage = "Добавлено серверов: \(parsed.count)"
+            } else if let single = ProxyConfig.parse(urlString: input) {
+                appendServers([single])
+                alertMessage = "Добавлен сервер: \(single.name)"
+            } else {
+                alertMessage = "Не удалось распознать формат ссылки или подписки."
             }
-            saveServers()
         }
+    }
+    
+    // Загрузка подписки по HTTPS
+    func downloadSubscription(from urlString: String) {
+        guard let url = URL(string: urlString) else {
+            alertMessage = "Некорректный HTTPS URL подписки"
+            return
+        }
+        
+        isLoadingSubscription = true
+        
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("HappVPN/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoadingSubscription = false
+                
+                if let error = error {
+                    self.alertMessage = "Ошибка загрузки: \(error.localizedDescription)"
+                    return
+                }
+                
+                guard let data = data, let text = String(data: data, encoding: .utf8) else {
+                    self.alertMessage = "Сервер вернул пустой или нечитаемый ответ"
+                    return
+                }
+                
+                let configs = ProxyConfig.parseSubscriptionContent(text)
+                if configs.isEmpty {
+                    self.alertMessage = "В подписке не найдено поддерживаемых серверов (VLESS, VMess, Trojan, SS)"
+                } else {
+                    self.appendServers(configs)
+                    self.alertMessage = "Успешно импортировано серверов: \(configs.count)"
+                }
+            }
+        }.resume()
+    }
+    
+    private func appendServers(_ newServers: [ProxyConfig]) {
+        for server in newServers {
+            if !servers.contains(where: { $0.rawUri == server.rawUri }) {
+                servers.append(server)
+            }
+        }
+        if selectedServer == nil {
+            selectedServer = servers.first
+        }
+        saveServers()
     }
     
     func selectServer(_ server: ProxyConfig) {
@@ -162,8 +227,13 @@ class VPNManager: ObservableObject {
         saveServers()
     }
     
+    func clearAllServers() {
+        servers.removeAll()
+        selectedServer = nil
+        saveServers()
+    }
+    
     func checkPing(for server: ProxyConfig) {
-        // Симуляция замера пинга
         if let index = servers.firstIndex(where: { $0.id == server.id }) {
             let fakePing = Int.random(in: 45...180)
             servers[index].pingMs = fakePing
@@ -182,7 +252,6 @@ class VPNManager: ObservableObject {
             self.servers = list
             self.selectedServer = list.first(where: { $0.isSelected }) ?? list.first
         } else {
-            // Тестовые ноды по умолчанию
             let sample = ProxyConfig(
                 id: UUID(),
                 name: "Германия (VLESS-Reality)",
@@ -198,4 +267,3 @@ class VPNManager: ObservableObject {
         }
     }
 }
-

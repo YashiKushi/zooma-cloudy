@@ -22,24 +22,32 @@ jobs:
     - name: Generate Xcode Project
       run: xcodegen generate
 
-    - name: Build and Package IPA
+    - name: Build App
       run: |
-        mkdir -p build Payload
-        
-        # Сборка проекта под архитектуру iOS
         xcodebuild -project HappVPN.xcodeproj \
           -scheme HappVPN \
           -configuration Release \
           -sdk iphoneos \
+          -derivedDataPath derived_data \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          CONFIGURATION_BUILD_DIR=build
-          
-        # Формирование .ipa архива
-        cp -r build/HappVPN.app Payload/
-        zip -r HappVPN.ipa Payload
+          CODE_SIGNING_ALLOWED=NO
+
+    - name: Package IPA
+      run: |
+        mkdir -p Payload
+        APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "HappVPN.app" -type d | head -n 1)
+        echo "Found app at: $APP_PATH"
         
+        # Проверка наличия Info.plist
+        if [ ! -f "$APP_PATH/Info.plist" ]; then
+          echo "Copying Info.plist directly into bundle..."
+          cp HappVPN/Info.plist "$APP_PATH/Info.plist"
+        fi
+        
+        cp -r "$APP_PATH" Payload/
+        zip -r HappVPN.ipa Payload
+
     - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:

@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject var vpnManager: VPNManager
     @State private var showingAddSheet = false
     @State private var newConfigText = ""
+    @State private var showAlert = false
     
     var body: some View {
         NavigationView {
@@ -37,10 +38,11 @@ struct ContentView: View {
                     // Список серверов
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("Конфигурации / Прокси")
+                            Text("Конфигурации (\(vpnManager.servers.count))")
                                 .font(.headline)
                                 .foregroundColor(.primary)
                             Spacer()
+                            
                             Button(action: {
                                 showingAddSheet = true
                             }) {
@@ -50,6 +52,15 @@ struct ContentView: View {
                             }
                         }
                         .padding(.horizontal)
+                        
+                        if vpnManager.isLoadingSubscription {
+                            HStack {
+                                Spacer()
+                                ProgressView("Загрузка подписки...")
+                                    .padding()
+                                Spacer()
+                            }
+                        }
                         
                         List {
                             ForEach(vpnManager.servers) { server in
@@ -71,7 +82,7 @@ struct ContentView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         if let clipboard = UIPasteboard.general.string {
-                            vpnManager.addServer(from: clipboard)
+                            vpnManager.addInput(clipboard)
                         }
                     }) {
                         Label("Вставить", systemImage: "doc.on.clipboard")
@@ -80,6 +91,16 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingAddSheet) {
                 addServerSheet
+            }
+            .alert(isPresented: Binding<Bool>(
+                get: { vpnManager.alertMessage != nil },
+                set: { if !$0 { vpnManager.alertMessage = nil } }
+            )) {
+                Alert(
+                    title: Text("Информация"),
+                    message: Text(vpnManager.alertMessage ?? ""),
+                    dismissButton: .default(Text("OK"))
+                )
             }
         }
     }
@@ -122,28 +143,39 @@ struct ContentView: View {
         }
     }
     
-    // Модальное окно добавления узла
+    // Модальное окно добавления
     private var addServerSheet: some View {
         NavigationView {
             Form {
-                Section(header: Text("Ссылка на конфигурацию")) {
+                Section(header: Text("Подписка или сервер")) {
                     TextEditor(text: $newConfigText)
                         .frame(height: 120)
-                    Text("Поддерживаются форматы: vless://, vmess://, trojan://, ss://")
+                    Text("Поддерживаются:\n• HTTPS ссылки на подписки (https://...)\n• Ссылки узлов: vless://, vmess://, trojan://, ss://\n• Закодированный Base64")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 
                 Section {
-                    Button("Добавить сервер") {
-                        vpnManager.addServer(from: newConfigText)
+                    Button(action: {
+                        if let clipboard = UIPasteboard.general.string {
+                            newConfigText = clipboard
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "doc.on.clipboard")
+                            Text("Вставить из буфера обмена")
+                        }
+                    }
+                    
+                    Button("Импортировать") {
+                        vpnManager.addInput(newConfigText)
                         newConfigText = ""
                         showingAddSheet = false
                     }
                     .disabled(newConfigText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .navigationTitle("Новый сервер")
+            .navigationTitle("Добавить")
             .navigationBarItems(leading: Button("Отмена") {
                 showingAddSheet = false
             })
@@ -209,4 +241,3 @@ struct ServerRow: View {
         .padding(.vertical, 4)
     }
 }
-

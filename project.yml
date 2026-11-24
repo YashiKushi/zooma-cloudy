@@ -10,17 +10,29 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: HappVPN
+    info:
+      path: HappVPN/Info.plist
+    dependencies:
+      - target: PacketTunnel
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.happ.vpn.client
-      INFOPLIST_KEY_CFBundleDisplayName: "Happ VPN"
-      INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      GENERATE_INFOPLIST_FILE: NO
+      INFOPLIST_FILE: HappVPN/Info.plist
+      CODE_SIGN_IDENTITY: ""
+      CODE_SIGNING_REQUIRED: "NO"
+      CODE_SIGNING_ALLOWED: "NO"
   PacketTunnel:
     type: app-extension
     platform: iOS
     deploymentTarget: "16.0"
     sources:
       - path: PacketTunnel
+    info:
+      path: PacketTunnel/Info.plist
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.happ.vpn.PacketTunnel
-      GENERATE_INFOPLIST_KEY_CFBundleDisplayName: "PacketTunnel"
+      GENERATE_INFOPLIST_FILE: NO
+      INFOPLIST_FILE: PacketTunnel/Info.plist
+      CODE_SIGN_IDENTITY: ""
+      CODE_SIGNING_REQUIRED: "NO"
+      CODE_SIGNING_ALLOWED: "NO"
