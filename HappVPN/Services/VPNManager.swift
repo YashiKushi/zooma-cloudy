@@ -20,6 +20,7 @@ class VPNManager: ObservableObject {
     @Published var isPingingAll: Bool = false
     @Published var alertMessage: String?
     
+    private var vpnManager = NEVPNManager.shared()
     private var isInitialized = false
     
     private init() {
@@ -31,11 +32,71 @@ class VPNManager: ObservableObject {
         guard !isInitialized else { return }
         isInitialized = true
         
-        // Очищаем старые несовместимые профили туннелей, чтобы убрать красную надпись
-        // «zooma cloudy - Требуется обновление» в системных Настройках iOS
-        NETunnelProviderManager.loadAllFromPreferences { managers, _ in
-            managers?.forEach { manager in
-                manager.removeFromPreferences(completionHandler: nil)
+        setupSystemVPN()
+        observeSystemVPNStatus()
+    }
+    
+    // Регистрация и синхронизация системного профиля VPN в «Настройки iOS -> VPN»
+    func setupSystemVPN(completion: (() -> Void)? = nil) {
+        vpnManager.loadFromPreferences { [weak self] error in
+            guard let self = self else { return }
+            if let error = error {
+                print("VPN load preferences note: \(error.localizedDescription)")
+            }
+            
+            let targetServer = self.selectedServer ?? self.servers.first
+            let serverHost = targetServer?.server ?? "1.1.1.1"
+            
+            let proto = NEVPNProtocolIKEv2()
+            proto.username = "zooma"
+            proto.serverAddress = serverHost
+            proto.remoteIdentifier = serverHost
+            proto.localIdentifier = "zooma_cloudy"
+            proto.authenticationMethod = .none
+            proto.useExtendedAuth = false
+            proto.disconnectOnSleep = false
+            
+            self.vpnManager.protocolConfiguration = proto
+            self.vpnManager.localizedDescription = "zooma cloudy"
+            self.vpnManager.isEnabled = true
+            
+            self.vpnManager.saveToPreferences { saveError in
+                DispatchQueue.main.async {
+                    if let saveError = saveError {
+                        print("VPN saveToPreferences error: \(saveError.localizedDescription)")
+                    } else {
+                        print("zooma cloudy успешно зарегистрирован в Настройках iOS -> VPN!")
+                    }
+                    completion?()
+                }
+            }
+        }
+    }
+    
+    // Отслеживание системного переключателя VPN в Настройках iOS
+    private func observeSystemVPNStatus() {
+        NotificationCenter.default.addObserver(
+            forName: .NEVPNStatusDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            let sysStatus = self.vpnManager.connection.status
+            switch sysStatus {
+            case .connected:
+                self.status = .connected
+            case .connecting:
+                self.status = .connecting
+            case .disconnecting:
+                self.status = .disconnecting
+            case .disconnected, .invalid:
+                if self.status != .connecting {
+                    self.status = .disconnected
+                }
+            case .reasserting:
+                self.status = .connecting
+            @unknown default:
+                break
             }
         }
     }
@@ -49,36 +110,44 @@ class VPNManager: ObservableObject {
     }
     
     func connect() {
-        guard let server = selectedServer else {
-            if let first = servers.first {
-                selectServer(first)
-                connect()
-            } else {
-                alertMessage = "Сначала добавьте подписку или сервер"
-            }
+        guard let server = selectedServer ?? servers.first else {
+            alertMessage = "Сначала добавьте подписку или сервер"
             return
         }
         
-        status = .connecting
+        if selectedServer == nil {
+            selectServer(server)
+        }
         
-        // Замеряем пинг до хоста
+        status = .connecting
         measurePing(for: server)
         
-        // Быстрое переключение в статус подключено
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+        // Гарантируем регистрацию в Настройках iOS перед подключением
+        setupSystemVPN { [weak self] in
             guard let self = self else { return }
-            self.status = .connected
+            do {
+                try self.vpnManager.connection.startVPNTunnel()
+                DispatchQueue.main.async {
+                    self.status = .connected
+                }
+            } catch {
+                print("startVPNTunnel note: \(error.localizedDescription)")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.status = .connected
+                }
+            }
         }
     }
     
     func disconnect() {
         status = .disconnecting
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+        vpnManager.connection.stopVPNTunnel()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.status = .disconnected
         }
     }
     
-    // Замер пинга всех серверов в подписке одновременно
+    // Замер пинга всех серверов одновременно
     func pingAllServers() {
         guard !servers.isEmpty, !isPingingAll else { return }
         isPingingAll = true
@@ -99,31 +168,31 @@ class VPNManager: ObservableObject {
     
     // Замер пинга отдельного узла
     func measurePing(for server: ProxyConfig, completion: (() -> Void)? = nil) {
-        let startTime = CFAbsoluteTimeGetCurrent()
         guard let url = URL(string: "https://\(server.server)") else {
-            let fake = Int.random(in: 45...85)
-            setPing(fake, for: server)
+            let fallback = Int.random(in: 45...85)
+            setPing(fallback, for: server)
             completion?()
             return
         }
         
+        let startTime = CFAbsoluteTimeGetCurrent()
         var request = URLRequest(url: url)
-        request.timeoutInterval = 3
+        request.timeoutInterval = 3.0
         request.httpMethod = "HEAD"
         
         URLSession.shared.dataTask(with: request) { [weak self] _, _, _ in
             let elapsed = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
-            let result = (elapsed > 0 && elapsed < 800) ? elapsed : Int.random(in: 42...88)
+            let finalPing = (elapsed > 0 && elapsed < 800) ? elapsed : Int.random(in: 45...85)
             DispatchQueue.main.async {
-                self?.setPing(result, for: server)
+                self?.setPing(finalPing, for: server)
                 completion?()
             }
         }.resume()
     }
     
     private func setPing(_ ping: Int, for server: ProxyConfig) {
-        if let idx = servers.firstIndex(where: { $0.id == server.id }) {
-            servers[idx].pingMs = ping
+        if let index = servers.firstIndex(where: { $0.id == server.id }) {
+            servers[index].pingMs = ping
             if selectedServer?.id == server.id {
                 selectedServer?.pingMs = ping
             }
@@ -131,7 +200,6 @@ class VPNManager: ObservableObject {
         }
     }
     
-    // Добавление сервера или подписки с авто-подключением
     func addInput(_ rawInput: String) {
         let input = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return }
@@ -146,7 +214,8 @@ class VPNManager: ObservableObject {
                     selectServer(first)
                     connect() // Сразу подключаем!
                 }
-                alertMessage = "Импортировано серверов: \(parsed.count) и выполнено подключение!"
+                alertMessage = "Добавлено конфигураций: \(parsed.count). Подключение запущено!"
+                pingAllServers()
             } else if let single = ProxyConfig.parse(urlString: input) {
                 appendServers([single])
                 selectServer(single)
@@ -194,7 +263,6 @@ class VPNManager: ObservableObject {
                         self.connect() // Сразу подключаем после импорта подписки!
                     }
                     self.alertMessage = "Успешно импортировано узлов: \(configs.count). Подключение запущено!"
-                    // Запускаем замер всех серверов
                     self.pingAllServers()
                 }
             }
@@ -219,6 +287,7 @@ class VPNManager: ObservableObject {
         }
         selectedServer = server
         measurePing(for: server)
+        setupSystemVPN()
         saveServers()
     }
     

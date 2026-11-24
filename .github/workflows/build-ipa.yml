@@ -62,6 +62,7 @@ jobs:
         plutil -replace CFBundleShortVersionString -string "1.0.0" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleIconFile -string "AppIcon" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleIconName -string "AppIcon" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace UILaunchStoryboardName -string "LaunchScreen" Payload/zooma_cloudy.app/Info.plist
         
         # Копируем иконки во всех стандартных форматах iOS
         ICON_DIR="HappVPN/Assets.xcassets/AppIcon.appiconset"
@@ -92,9 +93,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: v1.0.4
-        name: "zooma cloudy v1.0.4"
-        body: "Полный редизайн интерфейса, кнопка замера пинга всех серверов, удаление подписки и отдельных серверов, авто-подключение при добавлении подписки."
+        tag_name: v1.0.5
+        name: "zooma cloudy v1.0.5"
+        body: "Полноэкранный нативный интерфейс (без черных рамок), автоматическое добавление конфигурации в Настройки iOS -> VPN, авто-подключение и замер пинга."
         files: zooma-cloudy.ipa
         prerelease: false
         make_latest: true

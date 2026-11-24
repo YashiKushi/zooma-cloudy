@@ -20,41 +20,41 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // Глубокий премиальный фон в стиле Happ
+            // Премиальный глубокий темный фон Happ
             Color(red: 0.05, green: 0.06, blue: 0.09)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Шапка (Header)
+                // Шапка приложения
                 headerView
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                    .padding(.bottom, 12)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
+                    .padding(.bottom, 10)
                 
-                // Прокручиваемый список
+                // Основной скролл контента на весь экран
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        // Компактная карточка подключения (Hero Card)
+                    VStack(spacing: 14) {
+                        // Карточка подключения
                         heroConnectCard
                             .padding(.horizontal, 16)
                         
-                        // Панель управления и заголовок
+                        // Панель управления конфигурациями
                         controlBarView
                             .padding(.horizontal, 16)
                         
-                        // Список серверов
+                        // Список всех конфигураций
                         if vpnManager.servers.isEmpty {
                             emptyServersPlaceholder
                                 .padding(.horizontal, 16)
-                                .padding(.vertical, 24)
+                                .padding(.vertical, 20)
                         } else {
-                            LazyVStack(spacing: 10) {
+                            LazyVStack(spacing: 8) {
                                 ForEach(vpnManager.servers) { server in
                                     ServerCardRow(server: server)
                                 }
                             }
                             .padding(.horizontal, 16)
-                            .padding(.bottom, 34)
+                            .padding(.bottom, 30)
                         }
                     }
                 }
@@ -71,7 +71,7 @@ struct ContentView: View {
             case .deleteSubscription:
                 return Alert(
                     title: Text("Удалить подписку?"),
-                    message: Text("Все 14+ серверов будут удалены из приложения."),
+                    message: Text("Все серверы будут удалены из приложения."),
                     primaryButton: .destructive(Text("Удалить все")) {
                         withAnimation {
                             vpnManager.clearAllServers()
@@ -95,12 +95,12 @@ struct ContentView: View {
         }
     }
     
-    // Верхняя панель (Header)
+    // Шапка (Header)
     private var headerView: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("zooma cloudy")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                 
                 HStack(spacing: 6) {
@@ -108,7 +108,7 @@ struct ContentView: View {
                         .fill(statusColor)
                         .frame(width: 8, height: 8)
                     Text(statusTitle)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(statusColor)
                 }
             }
@@ -116,7 +116,7 @@ struct ContentView: View {
             Spacer()
             
             HStack(spacing: 10) {
-                // Быстрая вставка из буфера
+                // Вставить из буфера
                 Button(action: {
                     if let clipboard = UIPasteboard.general.string {
                         vpnManager.addInput(clipboard)
@@ -125,7 +125,7 @@ struct ContentView: View {
                     Image(systemName: "doc.on.clipboard.fill")
                         .font(.system(size: 15))
                         .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 38, height: 38)
                         .background(Color.white.opacity(0.10))
                         .clipShape(Circle())
                 }
@@ -137,7 +137,7 @@ struct ContentView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 38, height: 38)
                         .background(Color.blue)
                         .clipShape(Circle())
                 }
@@ -147,8 +147,8 @@ struct ContentView: View {
     
     // Компактная карточка подключения
     private var heroConnectCard: some View {
-        VStack(spacing: 14) {
-            // Круглая кнопка включения
+        VStack(spacing: 12) {
+            // Кнопка питания
             Button(action: {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                     vpnManager.toggleVPN()
@@ -156,8 +156,8 @@ struct ContentView: View {
             }) {
                 ZStack {
                     Circle()
-                        .stroke(statusColor.opacity(0.18), lineWidth: 10)
-                        .frame(width: 106, height: 106)
+                        .stroke(statusColor.opacity(0.18), lineWidth: 8)
+                        .frame(width: 92, height: 92)
                     
                     Circle()
                         .fill(
@@ -167,98 +167,103 @@ struct ContentView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 86, height: 86)
-                        .shadow(color: statusColor.opacity(0.5), radius: 14, x: 0, y: 6)
+                        .frame(width: 74, height: 74)
+                        .shadow(color: statusColor.opacity(0.45), radius: 12, x: 0, y: 5)
                     
                     if vpnManager.status == .connecting {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.2)
+                            .scaleEffect(1.1)
                     } else {
                         Image(systemName: "power")
-                            .font(.system(size: 34, weight: .semibold))
+                            .font(.system(size: 28, weight: .semibold))
                             .foregroundColor(.white)
                     }
                 }
             }
-            .padding(.top, 6)
+            .padding(.top, 4)
             
             // Выбранный узел
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 if let selected = vpnManager.selectedServer {
                     Text(selected.name)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 10)
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Text(selected.protocolType.rawValue)
                             .font(.system(size: 10, weight: .bold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
                             .background(Color.blue.opacity(0.25))
                             .foregroundColor(.blue)
-                            .cornerRadius(5)
+                            .cornerRadius(4)
                         
                         Text("\(selected.server):\(selected.port)")
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.gray)
+                            .lineLimit(1)
                         
                         if let ping = selected.pingMs {
                             Text("\(ping) ms")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundColor(ping < 100 ? Color.green : Color.orange)
-                                .padding(.horizontal, 6)
+                                .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(Color.white.opacity(0.08))
-                                .cornerRadius(5)
+                                .cornerRadius(4)
                         }
                     }
                 } else {
-                    Text("Выберите сервер из списка")
-                        .font(.system(size: 14))
+                    Text("Выберите сервер из списка ниже")
+                        .font(.system(size: 13))
                         .foregroundColor(.gray)
                 }
             }
-            .padding(.bottom, 4)
+            .padding(.bottom, 2)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color(red: 0.11, green: 0.12, blue: 0.17))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
         )
     }
     
-    // Панель управления конфигурациями
+    // Панель управления и заголовок
     private var controlBarView: some View {
         HStack {
             Text("Конфигурации (\(vpnManager.servers.count))")
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundColor(.white)
+                .lineLimit(1)
             
             Spacer()
             
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 // Кнопка замера всех
                 Button(action: {
                     vpnManager.pingAllServers()
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "bolt.fill")
+                            .font(.system(size: 11))
                         Text(vpnManager.isPingingAll ? "Тест..." : "Пинг всех")
+                            .font(.system(size: 11, weight: .semibold))
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .foregroundColor(.white)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 6)
-                    .background(Color.blue.opacity(0.3))
+                    .background(Color.blue.opacity(0.35))
                     .cornerRadius(8)
                 }
                 .disabled(vpnManager.servers.isEmpty || vpnManager.isPingingAll)
@@ -269,13 +274,16 @@ struct ContentView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "trash")
+                            .font(.system(size: 11))
                         Text("Очистить")
+                            .font(.system(size: 11, weight: .semibold))
                     }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.red.opacity(0.9))
-                    .padding(.horizontal, 10)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .foregroundColor(.red.opacity(0.95))
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 6)
-                    .background(Color.red.opacity(0.14))
+                    .background(Color.red.opacity(0.18))
                     .cornerRadius(8)
                 }
                 .disabled(vpnManager.servers.isEmpty)
@@ -286,7 +294,7 @@ struct ContentView: View {
     private var emptyServersPlaceholder: some View {
         VStack(spacing: 10) {
             Image(systemName: "tray")
-                .font(.system(size: 40))
+                .font(.system(size: 36))
                 .foregroundColor(.gray.opacity(0.4))
             Text("Нет серверов")
                 .font(.system(size: 15, weight: .semibold))
@@ -297,7 +305,7 @@ struct ContentView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(24)
+        .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(red: 0.09, green: 0.10, blue: 0.14))
@@ -309,7 +317,7 @@ struct ContentView: View {
             ZStack {
                 Color(red: 0.07, green: 0.08, blue: 0.12).ignoresSafeArea()
                 
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Вставьте HTTPS ссылку на подписку:")
                             .font(.system(size: 14, weight: .medium))
@@ -317,7 +325,7 @@ struct ContentView: View {
                         
                         TextEditor(text: $newConfigText)
                             .padding(10)
-                            .frame(height: 130)
+                            .frame(height: 120)
                             .background(Color.white.opacity(0.06))
                             .cornerRadius(12)
                             .foregroundColor(.white)
@@ -337,10 +345,10 @@ struct ContentView: View {
                             Image(systemName: "doc.on.clipboard")
                             Text("Вставить из буфера обмена")
                         }
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.blue)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 11)
                         .background(Color.blue.opacity(0.14))
                         .cornerRadius(12)
                     }
@@ -351,16 +359,26 @@ struct ContentView: View {
                         newConfigText = ""
                         showingAddSheet = false
                     }) {
-                        Text("Импортировать и подключить")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(newConfigText.trimmingCharacters(in: .whitespaces).isEmpty ? Color.gray.opacity(0.3) : Color.blue)
-                            .cornerRadius(14)
+                        HStack {
+                            if vpnManager.isLoadingSubscription {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .padding(.trailing, 6)
+                                Text("Импорт узлов...")
+                            } else {
+                                Image(systemName: "checkmark")
+                                Text("Сохранить и подключить")
+                            }
+                        }
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Color.blue)
+                        .cornerRadius(12)
                     }
-                    .disabled(newConfigText.trimmingCharacters(in: .whitespaces).isEmpty)
                     .padding(.horizontal)
+                    .disabled(newConfigText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vpnManager.isLoadingSubscription)
                     
                     Spacer()
                 }
@@ -370,27 +388,29 @@ struct ContentView: View {
             .navigationBarItems(
                 leading: Button("Отмена") {
                     showingAddSheet = false
-                }.foregroundColor(.blue)
+                }
+                .foregroundColor(.blue)
             )
         }
     }
     
     private var statusTitle: String {
         switch vpnManager.status {
-        case .connected: return "ПОДКЛЮЧЕНО"
-        case .connecting: return "ПОДКЛЮЧЕНИЕ..."
-        case .disconnecting: return "ОТКЛЮЧЕНИЕ..."
         case .disconnected: return "ОТКЛЮЧЕНО"
-        case .error(let msg): return "ОШИБКА: \(msg)"
+        case .connecting: return "ПОДКЛЮЧЕНИЕ..."
+        case .connected: return "ПОДКЛЮЧЕНО"
+        case .disconnecting: return "ОТКЛЮЧЕНИЕ..."
+        case .error: return "ОШИБКА"
         }
     }
     
     private var statusColor: Color {
         switch vpnManager.status {
-        case .connected: return Color(red: 0.20, green: 0.85, blue: 0.45)
-        case .connecting, .disconnecting: return Color(red: 1.0, green: 0.70, blue: 0.20)
-        case .disconnected: return Color(red: 0.55, green: 0.58, blue: 0.65)
-        case .error: return Color(red: 1.0, green: 0.35, blue: 0.35)
+        case .disconnected: return Color.gray
+        case .connecting: return Color.orange
+        case .connected: return Color(red: 0.18, green: 0.82, blue: 0.44)
+        case .disconnecting: return Color.orange
+        case .error: return Color.red
         }
     }
 }
@@ -401,29 +421,29 @@ struct ServerCardRow: View {
     let server: ProxyConfig
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             // Выбор сервера
             Button(action: {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     vpnManager.selectServer(server)
                 }
             }) {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Image(systemName: server.isSelected ? "checkmark.circle.fill" : "circle")
                         .foregroundColor(server.isSelected ? .blue : .gray.opacity(0.4))
-                        .font(.system(size: 20))
+                        .font(.system(size: 18))
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(server.name)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         
                         HStack(spacing: 6) {
                             Text(server.protocolType.rawValue)
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 6)
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(Color.blue.opacity(0.2))
                                 .foregroundColor(.blue)
@@ -432,21 +452,22 @@ struct ServerCardRow: View {
                             Text("\(server.server):\(server.port)")
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(.gray)
+                                .lineLimit(1)
                         }
                     }
                 }
             }
             .buttonStyle(PlainButtonStyle())
             
-            Spacer()
+            Spacer(minLength: 4)
             
             // Замер пинга
             if let ping = server.pingMs {
                 Text("\(ping) ms")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(pingColor(ping))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
                     .background(Color.white.opacity(0.07))
                     .cornerRadius(6)
             }
@@ -462,15 +483,16 @@ struct ServerCardRow: View {
                     .foregroundColor(.gray.opacity(0.7))
                     .padding(6)
             }
+            .buttonStyle(PlainButtonStyle())
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(server.isSelected ? Color(red: 0.14, green: 0.17, blue: 0.26) : Color(red: 0.10, green: 0.11, blue: 0.15))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(server.isSelected ? Color.blue.opacity(0.5) : Color.white.opacity(0.04), lineWidth: 1)
         )
     }
