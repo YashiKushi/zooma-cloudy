@@ -43,8 +43,8 @@ public class ExtensionPlatformInterface: NSObject, LibboxPlatformInterfaceProtoc
         return false
     }
     
-    public func getInterfaces() throws -> LibboxNetworkInterfaceIteratorProtocol? {
-        return nil
+    public func getInterfaces() throws -> any LibboxNetworkInterfaceIteratorProtocol {
+        throw NSError(domain: "Libbox", code: -1, userInfo: nil)
     }
     
     public func readWIFIState() -> LibboxWIFIState? {
@@ -57,6 +57,22 @@ public class ExtensionPlatformInterface: NSObject, LibboxPlatformInterfaceProtoc
     
     public func uid(byPackageName packageName: String?, ret0_: UnsafeMutablePointer<Int32>?) throws {
         ret0_?.pointee = 0
+    }
+    
+    public func clearDNSCache() {
+    }
+    
+    public func closeDefaultInterfaceMonitor(_ listener: (any LibboxInterfaceUpdateListenerProtocol)?) throws {
+    }
+    
+    public func startDefaultInterfaceMonitor(_ listener: (any LibboxInterfaceUpdateListenerProtocol)?) throws {
+    }
+    
+    public func findConnectionOwner(_ ipProtocol: Int32, sourceAddress: String?, sourcePort: Int32, destinationAddress: String?, destinationPort: Int32, ret0_: UnsafeMutablePointer<Int32>?) throws {
+        ret0_?.pointee = 0
+    }
+    
+    public func send(_ notification: LibboxNotification?) throws {
     }
 }
 #endif
@@ -97,9 +113,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 do {
                     let platformInterface = ExtensionPlatformInterface(self)
                     let service = try LibboxNewService(json, platformInterface, nil)
-                    self.boxService = service
-                    try service.start()
-                    NSLog("[PacketTunnel] Sing-box core successfully started!")
+                    if let service = service {
+                        self.boxService = service
+                        try service.start()
+                        NSLog("[PacketTunnel] Sing-box core successfully started!")
+                    }
                 } catch {
                     NSLog("[PacketTunnel] Sing-box core failed to start: \(error.localizedDescription)")
                 }
