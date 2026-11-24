@@ -14,6 +14,9 @@ targets:
           - "Info.plist"
     info:
       path: HappVPN/Info.plist
+    dependencies:
+      - target: PacketTunnel
+      - framework: Frameworks/Libbox.xcframework
     settings:
       PRODUCT_NAME: "zooma_cloudy"
       PRODUCT_BUNDLE_IDENTIFIER: com.zoomacloudy.app
@@ -22,6 +25,33 @@ targets:
       CODE_SIGN_ENTITLEMENTS: HappVPN/zooma_cloudy.entitlements
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       TARGETED_DEVICE_FAMILY: "1,2"
+      FRAMEWORK_SEARCH_PATHS: "$(inherited) $(PROJECT_DIR)/Frameworks"
+      LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+      CODE_SIGN_IDENTITY: ""
+      CODE_SIGNING_REQUIRED: "NO"
+      CODE_SIGNING_ALLOWED: "NO"
+  PacketTunnel:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: PacketTunnel
+        excludes:
+          - "Info.plist"
+          - "PacketTunnel.entitlements"
+    info:
+      path: PacketTunnel/Info.plist
+    dependencies:
+      - framework: Frameworks/Libbox.xcframework
+    settings:
+      PRODUCT_NAME: "PacketTunnel"
+      PRODUCT_BUNDLE_IDENTIFIER: com.zoomacloudy.app.PacketTunnel
+      INFOPLIST_FILE: PacketTunnel/Info.plist
+      GENERATE_INFOPLIST_FILE: NO
+      CODE_SIGN_ENTITLEMENTS: PacketTunnel/PacketTunnel.entitlements
+      TARGETED_DEVICE_FAMILY: "1,2"
+      FRAMEWORK_SEARCH_PATHS: "$(inherited) $(PROJECT_DIR)/Frameworks"
+      LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
       CODE_SIGN_IDENTITY: ""
       CODE_SIGNING_REQUIRED: "NO"
       CODE_SIGNING_ALLOWED: "NO"

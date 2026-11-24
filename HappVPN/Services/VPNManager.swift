@@ -22,7 +22,7 @@ class VPNManager: ObservableObject {
     @Published var isPingingAll: Bool = false
     @Published var alertMessage: String?
     
-    private var vpnManager = NEVPNManager.shared()
+    private var tunnelManager: NETunnelProviderManager?
     private var isInitialized = false
     
     private init() {
@@ -42,73 +42,47 @@ class VPNManager: ObservableObject {
         }
     }
     
-    // Получение или создание Persistent Keychain Reference для IKEv2 Shared Secret
-    private func getSharedSecretReference() -> Data? {
-        let service = "com.zoomacloudy.app.vpn"
-        let account = "zooma_shared_secret"
-        let secretData = "zooma_cloudy_psk_key".data(using: .utf8)!
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnPersistentRef as String: true
-        ]
-        
-        var result: CFTypeRef?
-        let copyStatus = SecItemCopyMatching(query as CFDictionary, &result)
-        if copyStatus == errSecSuccess, let persistentRef = result as? Data {
-            return persistentRef
-        }
-        
-        // Добавляем новый пароль, если его еще нет
-        let addQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: secretData,
-            kSecReturnPersistentRef as String: true
-        ]
-        
-        var newResult: CFTypeRef?
-        let addStatus = SecItemAdd(addQuery as CFDictionary, &newResult)
-        if addStatus == errSecSuccess, let persistentRef = newResult as? Data {
-            return persistentRef
-        }
-        
-        return nil
-    }
-    
-    // Регистрация и синхронизация системного профиля VPN в «Настройки iOS -> VPN»
+    // Регистрация и синхронизация системного профиля VPN в «Настройки iOS -> VPN устройства»
     func setupSystemVPN(completion: (() -> Void)? = nil) {
-        vpnManager.loadFromPreferences { [weak self] error in
+        NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
             guard let self = self else { return }
             if let error = error {
-                print("VPN loadFromPreferences note: \(error.localizedDescription)")
+                print("VPN loadAllFromPreferences note: \(error.localizedDescription)")
             }
             
+            let manager = managers?.first ?? NETunnelProviderManager()
+            let proto = NETunnelProviderProtocol()
+            
+            let mainId = Bundle.main.bundleIdentifier ?? "com.zoomacloudy.app"
+            proto.providerBundleIdentifier = "\(mainId).PacketTunnel"
+            
             let targetServer = self.selectedServer ?? self.servers.first
-            let serverHost = targetServer?.server ?? "1.1.1.1"
-            
-            let proto = NEVPNProtocolIKEv2()
+            let serverHost = targetServer?.server ?? "zooma cloudy"
             proto.serverAddress = serverHost
-            proto.remoteIdentifier = serverHost
-            proto.localIdentifier = "zooma_client"
-            proto.authenticationMethod = .sharedSecret
-            proto.sharedSecretReference = self.getSharedSecretReference()
-            proto.disconnectOnSleep = false
             
-            self.vpnManager.protocolConfiguration = proto
-            self.vpnManager.localizedDescription = "zooma cloudy"
-            self.vpnManager.isEnabled = true
+            if let s = targetServer {
+                let configJson = SingBoxConfig.generate(from: s)
+                proto.providerConfiguration = [
+                    "configJson": configJson,
+                    "server": s.server,
+                    "port": s.port,
+                    "rawUri": s.rawUri,
+                    "protocol": s.protocolType.rawValue
+                ]
+            }
             
-            self.vpnManager.saveToPreferences { [weak self] saveError in
+            manager.protocolConfiguration = proto
+            manager.localizedDescription = "zooma cloudy"
+            manager.isEnabled = true
+            
+            manager.saveToPreferences { [weak self] saveError in
                 DispatchQueue.main.async {
                     if let saveError = saveError {
                         print("VPN saveToPreferences error: \(saveError.localizedDescription)")
                         self?.alertMessage = "Ошибка регистрации VPN: \(saveError.localizedDescription)"
                     } else {
                         print("zooma cloudy успешно зарегистрирован в Настройках iOS -> VPN!")
+                        self?.tunnelManager = manager
                     }
                     completion?()
                 }
@@ -123,8 +97,8 @@ class VPNManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self = self else { return }
-            let sysStatus = self.vpnManager.connection.status
+            guard let self = self, let manager = self.tunnelManager else { return }
+            let sysStatus = manager.connection.status
             switch sysStatus {
             case .connected:
                 self.status = .connected
@@ -167,14 +141,18 @@ class VPNManager: ObservableObject {
         
         // Гарантируем регистрацию в Настройках iOS перед подключением
         setupSystemVPN { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, let manager = self.tunnelManager else { return }
+            let configJson = SingBoxConfig.generate(from: server)
+            let options: [String: NSObject] = [
+                "configJson": configJson as NSString
+            ]
             do {
-                try self.vpnManager.connection.startVPNTunnel()
+                try (manager.connection as? NETunnelProviderSession)?.startTunnel(options: options)
                 DispatchQueue.main.async {
                     self.status = .connected
                 }
             } catch {
-                print("startVPNTunnel note: \(error.localizedDescription)")
+                print("startTunnel note: \(error.localizedDescription)")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.status = .connected
                 }
@@ -184,7 +162,7 @@ class VPNManager: ObservableObject {
     
     func disconnect() {
         status = .disconnecting
-        vpnManager.connection.stopVPNTunnel()
+        (tunnelManager?.connection as? NETunnelProviderSession)?.stopTunnel()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.status = .disconnected
         }

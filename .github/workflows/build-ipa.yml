@@ -22,10 +22,22 @@ jobs:
     - name: Install XcodeGen
       run: brew install xcodegen
 
+    - name: Download Sing-box Libbox framework
+      run: |
+        mkdir -p Frameworks
+        echo "Downloading Libbox.xcframework..."
+        curl -L -o Libbox.xcframework.zip "https://github.com/EbrahimTahernejad/sing-box-lib/releases/download/1.11.11/Libbox.xcframework.zip"
+        unzip -q Libbox.xcframework.zip -d Frameworks
+        ls -la Frameworks/
+        if [ -d "Frameworks/Libbox.xcframework" ]; then
+          echo "Libbox.xcframework successfully extracted!"
+          find Frameworks/Libbox.xcframework -maxdepth 3
+        fi
+
     - name: Generate Xcode Project
       run: xcodegen generate
 
-    - name: Build App
+    - name: Build App & PacketTunnel Extension
       run: |
         xcodebuild -project "zooma_cloudy.xcodeproj" \
           -scheme "zooma_cloudy" \
@@ -44,14 +56,36 @@ jobs:
         APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
         echo "Found compiled app at: $APP_PATH"
         
-        # Копируем приложение в Payload и даем полные права
+        # Копируем приложение в Payload
         cp -R "$APP_PATH" Payload/zooma_cloudy.app
         chmod -R 777 Payload/
         
-        # Удаляем PlugIns для предотвращения ошибки 0xe8008018 при установке в Feather
-        rm -rf Payload/zooma_cloudy.app/PlugIns
+        # Настройка и валидация PacketTunnel.appex внутри PlugIns
+        if [ -d "Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex" ]; then
+          echo "Configuring PacketTunnel.appex Info.plist..."
+          cp -f PacketTunnel/Info.plist Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -replace CFBundleExecutable -string "PacketTunnel" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -replace CFBundleIdentifier -string "com.zoomacloudy.app.PacketTunnel" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -replace CFBundleShortVersionString -string "1.0.0" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -replace CFBundleVersion -string "1" Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          plutil -convert binary1 Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Info.plist
+          
+          # Внедряем Libbox.framework в PacketTunnel.appex/Frameworks
+          if [ -d "Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework" ]; then
+            echo "Embedding Libbox.framework into PacketTunnel..."
+            mkdir -p Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks
+            cp -R Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/
+          fi
+        fi
         
-        # Перезаписываем Info.plist
+        # Внедряем Libbox.framework в Main App Frameworks
+        if [ -d "Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework" ]; then
+          echo "Embedding Libbox.framework into Main App..."
+          mkdir -p Payload/zooma_cloudy.app/Frameworks
+          cp -R Frameworks/Libbox.xcframework/ios-arm64/Libbox.framework Payload/zooma_cloudy.app/Frameworks/
+        fi
+        
+        # Перезаписываем Info.plist основного приложения
         cp -f HappVPN/Info.plist Payload/zooma_cloudy.app/Info.plist
         
         # Принудительно устанавливаем свойства для иконки и названий
@@ -60,6 +94,7 @@ jobs:
         plutil -replace CFBundleExecutable -string "zooma_cloudy" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleIdentifier -string "com.zoomacloudy.app" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleShortVersionString -string "1.0.0" Payload/zooma_cloudy.app/Info.plist
+        plutil -replace CFBundleVersion -string "1" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleIconFile -string "AppIcon" Payload/zooma_cloudy.app/Info.plist
         plutil -replace CFBundleIconName -string "AppIcon" Payload/zooma_cloudy.app/Info.plist
         plutil -replace UILaunchStoryboardName -string "LaunchScreen" Payload/zooma_cloudy.app/Info.plist
@@ -75,9 +110,24 @@ jobs:
         # Компилируем Info.plist в бинарный формат iOS
         plutil -convert binary1 Payload/zooma_cloudy.app/Info.plist
         
+        # Проставляем Ad-Hoc подпись для валидной структуры пакета под Feather/sideloading
+        if [ -d "Payload/zooma_cloudy.app/Frameworks/Libbox.framework" ]; then
+          codesign --force --sign - --timestamp=none Payload/zooma_cloudy.app/Frameworks/Libbox.framework || true
+        fi
+        if [ -d "Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/Libbox.framework" ]; then
+          codesign --force --sign - --timestamp=none Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex/Frameworks/Libbox.framework || true
+        fi
+        if [ -d "Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex" ]; then
+          codesign --force --sign - --timestamp=none --entitlements PacketTunnel/PacketTunnel.entitlements Payload/zooma_cloudy.app/PlugIns/PacketTunnel.appex || true
+        fi
+        codesign --force --sign - --timestamp=none --entitlements HappVPN/zooma_cloudy.entitlements Payload/zooma_cloudy.app || true
+        
         # Выводим верификацию в лог сборки
-        echo "=== VERIFIED PLIST IN PAYLOAD ==="
-        plutil -p Payload/zooma_cloudy.app/Info.plist
+        echo "=== VERIFIED APP STRUCTURE IN PAYLOAD ==="
+        ls -la Payload/zooma_cloudy.app
+        if [ -d "Payload/zooma_cloudy.app/PlugIns" ]; then
+          ls -la Payload/zooma_cloudy.app/PlugIns
+        fi
         
         # Архивируем в .ipa
         zip -r -y "zooma-cloudy.ipa" Payload
@@ -93,9 +143,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
       with:
-        tag_name: v1.0.8
-        name: "zooma cloudy v1.0.8"
-        body: "Чистая установка без ошибки 0xe8008018, регистрация профиля VPN через NEVPNManager с Keychain shared secret, реальный TCP пинг."
+        tag_name: v1.0.9
+        name: "zooma cloudy v1.0.9"
+        body: "Полноценный клиент VLESS Reality на ядре sing-box (Libbox.xcframework) с профилем в «VPN устройства» через NETunnelProviderManager, реальный TCP пинг, полноэкранный интерфейс."
         files: zooma-cloudy.ipa
         prerelease: false
         make_latest: true

@@ -1,49 +1,104 @@
+import Foundation
 import NetworkExtension
+
+#if canImport(Libbox)
+import Libbox
+
+public class ExtensionPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol {
+    private weak var provider: PacketTunnelProvider?
+    
+    init(_ provider: PacketTunnelProvider) {
+        self.provider = provider
+        super.init()
+    }
+    
+    public func openTun(_ options: LibboxTunOptionsProtocol?, ret0_: UnsafeMutablePointer<Int32>?) throws {
+        if let fd = provider?.packetFlow.value(forKeyPath: "fileDescriptor") as? Int32 {
+            ret0_?.pointee = fd
+        } else {
+            ret0_?.pointee = 0
+        }
+    }
+    
+    public func usePlatformAutoDetectControl() -> Bool {
+        return false
+    }
+    
+    public func autoDetectControl(_ fd: Int32) throws {
+    }
+    
+    public func writeLog(_ message: String?) {
+        NSLog("[sing-box] %@", message ?? "")
+    }
+    
+    public func useProcFS() -> Bool {
+        return false
+    }
+    
+    public func underNetworkExtension() -> Bool {
+        return true
+    }
+    
+    public func includeAllNetworks() -> Bool {
+        return false
+    }
+}
+#endif
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
 
+#if canImport(Libbox)
+    private var boxService: LibboxBoxService?
+#endif
+
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        // Конфигурация виртуального сетевого интерфейса (TUN)
-        let tunnelNetworkSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "10.0.0.1")
+        let tunnelNetworkSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "172.19.0.1")
         
-        // IPv4 параметры
-        let ipv4Settings = NEIPv4Settings(addresses: ["10.0.0.2"], subnetMasks: ["255.255.255.0"])
+        let ipv4Settings = NEIPv4Settings(addresses: ["172.19.0.2"], subnetMasks: ["255.255.255.252"])
         ipv4Settings.includedRoutes = [NEIPv4Route.default()]
         tunnelNetworkSettings.ipv4Settings = ipv4Settings
         
-        // DNS серверы (Cloudflare & Google)
         let dnsSettings = NEDNSSettings(servers: ["1.1.1.1", "8.8.8.8"])
         tunnelNetworkSettings.dnsSettings = dnsSettings
-        
-        // MTU
         tunnelNetworkSettings.mtu = 1500
         
-        // Применяем настройки сети
         setTunnelNetworkSettings(tunnelNetworkSettings) { [weak self] error in
             if let error = error {
                 completionHandler(error)
                 return
             }
+            guard let self = self else { return }
             
-            // В продакшн сборках здесь запускается Go-ядро (Xray-core / Sing-box core)
-            // через Libbox.xcframework или XrayKit.xcframework:
-            // LibboxStart(configJson, self?.packetFlow)
+            var configJson = options?["configJson"] as? String
+            if configJson == nil || configJson?.isEmpty == true {
+                if let proto = self.protocolConfiguration as? NETunnelProviderProtocol {
+                    configJson = proto.providerConfiguration?["configJson"] as? String
+                }
+            }
             
-            self?.startPacketForwarding()
+            #if canImport(Libbox)
+            if let json = configJson, !json.isEmpty {
+                do {
+                    let platformInterface = ExtensionPlatformInterface(self)
+                    let service = try LibboxNewService(json, platformInterface)
+                    self.boxService = service
+                    try service.start()
+                    NSLog("[PacketTunnel] Sing-box core successfully started!")
+                } catch {
+                    NSLog("[PacketTunnel] Sing-box core failed to start: \(error.localizedDescription)")
+                }
+            }
+            #endif
+            
             completionHandler(nil)
         }
     }
     
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        // Остановка Xray ядра и очистка ресурсов
+        #if canImport(Libbox)
+        try? boxService?.close()
+        boxService = nil
+        #endif
         completionHandler()
     }
-    
-    private func startPacketForwarding() {
-        packetFlow.readPackets { [weak self] (packets, protocols) in
-            // Чтение пакетов из tun интерфейса и отправка в прокси-туннель
-            self?.startPacketForwarding()
-        }
-    }
 }
-
