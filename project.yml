@@ -14,8 +14,6 @@ targets:
           - "Info.plist"
     info:
       path: HappVPN/Info.plist
-    dependencies:
-      - target: PacketTunnel
     settings:
       PRODUCT_NAME: "zooma_cloudy"
       PRODUCT_BUNDLE_IDENTIFIER: com.zoomacloudy.app
@@ -23,24 +21,6 @@ targets:
       GENERATE_INFOPLIST_FILE: NO
       CODE_SIGN_ENTITLEMENTS: HappVPN/zooma_cloudy.entitlements
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      TARGETED_DEVICE_FAMILY: "1,2"
-      CODE_SIGN_IDENTITY: ""
-      CODE_SIGNING_REQUIRED: "NO"
-      CODE_SIGNING_ALLOWED: "NO"
-  PacketTunnel:
-    type: app-extension
-    platform: iOS
-    deploymentTarget: "15.0"
-    sources:
-      - path: PacketTunnel
-    info:
-      path: PacketTunnel/Info.plist
-    settings:
-      PRODUCT_NAME: "PacketTunnel"
-      PRODUCT_BUNDLE_IDENTIFIER: com.zoomacloudy.app.PacketTunnel
-      INFOPLIST_FILE: PacketTunnel/Info.plist
-      GENERATE_INFOPLIST_FILE: NO
-      CODE_SIGN_ENTITLEMENTS: PacketTunnel/PacketTunnel.entitlements
       TARGETED_DEVICE_FAMILY: "1,2"
       CODE_SIGN_IDENTITY: ""
       CODE_SIGNING_REQUIRED: "NO"
