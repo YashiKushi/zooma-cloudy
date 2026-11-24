@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Плавный синий градиент в стиле iOS -->
+    <linearGradient id="cloudyBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1890FF"/>
+      <stop offset="100%" stop-color="#094FB5"/>
+    </linearGradient>
+    
+    <!-- Мягкая тень под облаком -->
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="30" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Фон иконки -->
+  <rect width="1024" height="1024" fill="url(#cloudyBg)"/>
+
+  <!-- Минималистичное простое белое облако -->
+  <g filter="url(#softShadow)">
+    <path d="M 737.28 696.32
+             L 286.72 696.32
+             A 120 120 0 0 1 245.76 463.36
+             A 140 140 0 0 1 450.56 348.16
+             A 160 160 0 0 1 737.28 471.04
+             A 115 115 0 0 1 737.28 696.32 Z" 
+          fill="#FFFFFF"/>
+  </g>
+</svg>
