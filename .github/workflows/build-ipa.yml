@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
@@ -35,26 +38,55 @@ jobs:
 
     - name: Package IPA
       run: |
-        mkdir -p Payload
-        APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "*.app" -type d -maxdepth 1 | head -n 1)
-        echo "Found compiled app bundle at: $APP_PATH"
+        APP_PATH="derived_data/Build/Products/Release-iphoneos/zooma_cloudy.app"
         
-        # Гарантируем корректный Info.plist внутри .app
+        if [ ! -d "$APP_PATH" ]; then
+          echo "ERROR: App bundle not found at $APP_PATH. Searching..."
+          APP_PATH=$(find derived_data/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
+        fi
+        
+        echo "Using app bundle: $APP_PATH"
+        
+        # Записываем чистый статический Info.plist
         cp HappVPN/Info.plist "$APP_PATH/Info.plist"
         
-        # Копируем иконки в корень бандла для корректного отображения в Feather/iOS
+        # Компилируем Info.plist в бинарный формат iOS
+        plutil -convert binary1 "$APP_PATH/Info.plist"
+        
+        # Выводим в лог для проверки
+        echo "=== VERIFYING INFO.PLIST ==="
+        plutil -p "$APP_PATH/Info.plist"
+        
+        # Копируем иконки в корень бандла
         if [ -f "HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" ]; then
           cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon60x60@2x.png"
           cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon60x60@3x.png"
           cp HappVPN/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png "$APP_PATH/AppIcon.png"
         fi
         
-        # Копируем в Payload для формирования валидного IPA
-        cp -r "$APP_PATH" Payload/
-        zip -r "zooma-cloudy.ipa" Payload
+        # Формируем структуру Payload
+        rm -rf Payload
+        mkdir -p Payload
+        cp -R "$APP_PATH" Payload/
+        
+        # Упаковываем в .ipa
+        zip -r -y "zooma-cloudy.ipa" Payload
+        ls -la "zooma-cloudy.ipa"
 
     - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:
         name: zooma-cloudy-ipa
         path: "zooma-cloudy.ipa"
+
+    - name: Publish Direct IPA to GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
+      with:
+        tag_name: latest
+        name: "zooma cloudy v1.0.0"
+        body: "Прямая ссылка для скачивания .ipa файла (без zip-архива) для Feather / Sideloadly / TrollStore."
+        files: zooma-cloudy.ipa
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
